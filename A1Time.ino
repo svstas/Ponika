@@ -28,10 +28,7 @@ void ctime(char * fdate) {
 
  setTime(shour,smin,ssec,sdate,smon,syear);
  conf.startTime = now();
- //setTime(now()+3600*conf.timeZone);
- 
-//  sendEvent(String(sdate)+" - "+String(smon)+" - "+String(syear)+" - "+String(shour)+" - "+String(smin)+" - "+String(ssec),"sms");  
-}
+ }
 
 #define countof(a) (sizeof(a) / sizeof(a[0]))
 
