@@ -1,0 +1,165 @@
+<html>
+  <head>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+    <title>WebSocketTester</title>
+    <style type="text/css" media="screen">
+    body {
+      margin:0;
+      padding:0;
+      background-color: black;
+      font-size:20px;  
+      overflow-X:hidden;
+      
+    }
+
+    #dbg, #input_div, #input_el {
+      font-size: 14px;
+      line-height: 16px;
+      color: #bbb;
+      padding-left:4px;
+    }
+
+    #dbg, #input_div {
+      font-family: Consolas,monospace;
+      margin:0;
+      padding:0;
+      padding-left:4px;
+    }
+    #input_div {
+      margin:0;
+      padding:0;
+      padding-left:4px;
+    }
+
+    #input_el {
+      font-size:16px;
+      width:98%;
+      background-color: rgba(0,0,0,0);
+      border: 0px;
+    }
+    #input_el:focus {
+      outline: none;
+    }
+    </style>
+    <script type="text/javascript">
+    var ws = null;
+    var xhistory = Array(); 
+    var pp=0;
+
+document.onkeydown = function(e) {
+    e = e || window.event;
+//    if (e.keyCode == 13) {
+        ge("input_el").focus();
+
+//      alert("Hello");
+//      }
+	  return true;
+   }
+
+
+    function ge(s){ return document.getElementById(s);}
+    function ce(s){ return document.createElement(s);}
+    function stbx(){ xdiv = ge("work");xdiv.scrollTop=xdiv.scrollHeight-xdiv.clientHeight;
+    ge("input_el").focus();
+    alerrt();
+      
+    }
+//    function stb(){ ge("work").scrollTo(0, window.document.scrollHeight || window.documentElement.scrollHeight);ge("input_el").focus(); }
+    function sendBlob(str){
+      var buf = new Uint8Array(str.length);
+      for (var i = 0; i < str.length; ++i) buf[i] = str.charCodeAt(i);
+      ws.send(buf);
+    }
+    function addMessage(m){
+      return;
+      var msg = ce("div");
+      msg.innerText = m;
+      ge("dbg").appendChild(msg);
+      stbx();
+//      ge("dbg").insertBefore(msg, ge("dbg").firstChild);
+  //    window.setTimeout("alert();stb()",1000);
+    }
+    function startSocket(){
+      ws = new WebSocket('ws://'+document.location.host+'/ws',['arduino']);
+      ws.binaryType = "arraybuffer";
+      ws.onopen = function(e){
+        addMessage("Connected");
+        ge("input_el").focus();
+      
+      };
+      
+      ws.onclose = function(e){
+        addMessage("Disconnected");
+       xx = window.setTimeout("startSocket()",3000); 
+      };
+      ws.onerror = function(e){
+        console.log("ws error", e);
+        addMessage("Error");
+
+      };
+      ws.onmessage = function(e){
+        var msg = "";
+        if(e.data instanceof ArrayBuffer){
+          msg = "BIN:";
+          var bytes = new Uint8Array(e.data);
+          for (var i = 0; i < bytes.length; i++) {
+            msg += String.fromCharCode(bytes[i]);
+          }
+        } else {
+          msg = "TXT:"+e.data;
+        }
+        addMessage(msg);
+        ge("input_el").focus();
+  
+      };
+      
+      ge("input_el").onkeydown = function(e){
+    //    stb();
+        
+        if(e.keyCode == 13 && ge("input_el").value != ""){
+          
+          val = ge("input_el").value;
+    
+          top.xcommand = val;
+          xhistory[pp]=val;pp++;
+          
+          if (val=="reset") top.addMessage("Перезагрузка, подождите...");
+          
+          if (val=='r') {startSocket(); return;}
+          digs = val.match(/^lb3(\d+)/);
+          if (digs) {
+            if (digs>1024) digs=1024;
+            top.xfun = parseInt(Math.round(digs/100));
+          }
+          ws.send(val);
+          ge("input_el").value = "";
+          ge("input_el").focus();
+
+        } else if (e.keyCode==38) { 
+          
+              e.returnValue=false;pp--; if (xhistory[pp]) {ge("input_el").value = xhistory[pp]+'';
+              ge("input_el").selectionStart = ge("input_el").value.length;} else pp++;
+              
+        } else if (e.keyCode==40) {
+              e.returnValue=false;pp++; if (xhistory[pp]) ge("input_el").value = xhistory[pp]+''; else pp--;
+          
+        }
+        
+      }
+    }
+    
+    function onBodyLoad(){
+      startSocket();
+      top.sstarted=true;
+//      startEvents();
+    }
+    top.loaded=true;
+    </script>
+  </head>
+  <body id="body" onload="onBodyLoad()" style=''>
+    <div id="work" style='overflow-Y:scroll;overflow-X:hidden;bottom:0px;position:absolute;width:100%;height:100%'><pre id="dbg" style='width:100%;'></pre>    
+    <div id="input_div" style='width:98%'><nobr>
+      [ponika ~]#<input type="text" value="" id="input_el">
+    </nobr></div></div>
+  </body>
+</html>

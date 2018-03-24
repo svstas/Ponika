@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">  
+  <link rel="stylesheet" type="text/css" media="screen" href="/admin/styles.css">
+<title>ESP Editor</title>
+<script>
+top.xrefr=0;
+if (typeof XMLHttpRequest === "undefined") {
+  XMLHttpRequest = function () {
+    try { return new ActiveXObject("Msxml2.XMLHTTP.6.0"); } catch (e) {}
+    try { return new ActiveXObject("Msxml2.XMLHTTP.3.0"); } catch (e) {}
+    try { return new ActiveXObject("Microsoft.XMLHTTP"); } catch (e) {}
+    throw new Error("This browser does not support XMLHttpRequest.");
+  };
+}
+
+function ge(a){return document.getElementById(a);}
+function ce(a){return document.createElement(a);}
+function w(a){document.write(a);}
+
+var QueuedRequester = function () {
+  this.queue = [];
+  this.running = false;
+  this.xmlhttp = null;
+}
+
+QueuedRequester.prototype = {
+  _request: function(req){
+    this.running = true;
+    if(!req instanceof Object) return;
+    var that = this;
+    
+    function ajaxCb(x,d){ return function(){
+      if (x.readyState == 4){
+        ge("loader").style.display = "none";
+        d.callback(x.status, x.responseText);
+        if(that.queue.length === 0) that.running = false;
+        if(that.running) that._request(that.queue.shift());
+      }
+    }}
+    
+    ge("loader").style.display = "block";
+    
+    var p = "";
+    if(req.params instanceof FormData){
+      p = req.params;
+    } else if(req.params instanceof Object){
+      for (var key in req.params) {
+        if(p === "")
+          p += (req.method === "GET")?"?":"";
+        else
+          p += "&";
+        p += encodeURIComponent(key+"="+req.params[key]);
+      };
+    }
+    
+    this.xmlhttp = new XMLHttpRequest();
+    this.xmlhttp.onreadystatechange = ajaxCb(this.xmlhttp, req);
+    if(req.method === "GET"){
+      ge('saveButton').style='top:5px';
+      this.xmlhttp.open(req.method, req.url+p, true);
+      this.xmlhttp.send();
+    } else {
+      this.xmlhttp.open(req.method, req.url, true);
+      if(p instanceof String)
+        this.xmlhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+      this.xmlhttp.send(p);
+    }
+  },
+  stop: function(){
+    if(this.running) this.running = false;
+    if(this.xmlhttp && this.xmlhttp.readyState < 4){
+      this.xmlhttp.abort();
+    }
+  },
+  add: function(method, url, params, callback){
+    this.queue.push({url:url,method:method,params:params,callback:callback});
+    if(!this.running){
+      this._request(this.queue.shift());
+    }
+  }
+}
+var requests = new QueuedRequester();
+function createFileUploader(element, tree, editor){
+  var xmlHttp;
+  var logo = ce("div");
+//  logo.src = "";
+  logo.onclick = function(){top.location='/';}
+
+  
+  logo.style = 'display:block;text-align:left;position:absolute;left:0px;width:180px;height:38px;border-bottom:outset 2px;cursor:pointer;background:#8cc04b url("data:image/png;base64,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") no-repeat 10px 0px;';
+
+  
+//  background:url(/admin/img/ponika.png) no-repeat;width:78px;cursor:pointer;height:20px;margin-top:5px;text-align:left;position:absolute;';
+  ge(element).appendChild(logo);
+  bar = ce("div");
+  bar.style = 'position:absolute;right:10px;top:5px;';
+  bar.innerHTML = "<a href='#' style='color:#FFFFFF' onclick='download_frame.src=\"/reset\";top.location=top.location;'>reset</a>";
+  ge(element).appendChild(bar);
+  var input = ce("input");
+  input.type = "file";
+  input.multiple = false;
+  input.name = "data";
+  input.style='padding-left:230px;padding-top:8px;';
+  ge(element).appendChild(input);
+  var path = ce("input");
+  path.id = "upload-path";
+  path.type = "text";
+  path.name = "path";
+  path.defaultValue = "/";
+  ge(element).appendChild(path);
+  var button = ce("button");
+  button.innerHTML = 'Upload';
+  ge(element).appendChild(button);
+  var mkfile = ce("button");
+  mkfile.innerHTML = 'Create';
+  ge(element).appendChild(mkfile);
+
+  function httpPostProcessRequest(status, responseText){
+    if(status != 200)
+      alert("ERROR["+status+"]: "+responseText);
+    else
+      tree.refreshPath(path.value);
+  }
+  function createPath(p){
+    var formData = new FormData();
+    formData.append("path", p);
+    requests.add("PUT", "/admin/edit/", formData, httpPostProcessRequest);
+  }
+  
+  mkfile.onclick = function(e){
+    if(path.value.indexOf(".") === -1) return;
+    createPath(path.value);
+    editor.loadUrl(path.value);
+  };
+  button.onclick = function(e){
+    if(input.files.length === 0){
+      return;
+    }
+    var formData = new FormData();
+    formData.append("data", input.files[0], path.value);
+    requests.add("POST", "/admin/edit/", formData, httpPostProcessRequest);
+  };
+
+  input.onchange = function(e){
+    if(input.files.length === 0) return;
+    var filename = input.files[0].name;
+    var ext = /(?:\.([^.]+))?$/.exec(filename)[1];
+    var name = /(.*)\.[^.]+$/.exec(filename)[1];
+    if(typeof name !== undefined){
+      filename = name;
+    }
+    if(typeof ext !== undefined){
+      filename = filename + "." + ext;
+    }
+    if(path.value === "/" || path.value.lastIndexOf("/") === 0){
+      path.value = "/"+filename;
+    } else {
+      path.value = path.value.substring(0, path.value.lastIndexOf("/")+1)+filename;
+    }
+  };
+}
+
+function xrefresh() {
+  top.xrefr=1;
+  ge("tree").style.display = "none";
+  var tree = createTree("tree", editor);
+  window.setTimeout("document.location='/admin/edit/'",50);
+}
+
+function createTree(element, editor){
+  var preview = ge("preview");
+  var treeRoot = ce("div");
+  xx = ce("div");
+  xx.innerHTML = "<div class='plashka'><span onclick='xrefresh()' title = 'Refresh dir list' style='cursor:pointer'>Files</span><span id='_space' style='float:right;font-size:12px;font-family:MS Sans Serif;color:#006699;margin-right:10px'></span></div>";
+  treeRoot.className = "tvu";
+  ge(element).appendChild(xx);
+  ge(element).appendChild(treeRoot);
+
+  function loadDownload(path){
+    ge('download_frame').src = "/admin/edit/?download="+path;
+  }
+
+  function loadPreview(path){
+    ge("editor").style.display = "none";
+    preview.style.display = "block";
+    preview.innerHTML = '<center><img src="/admin/edit/?edit='+path+'&_cb='+Date.now()+'" style="max-width:100%;max-height:100%;padding:20px;margin:20px;border:solid 1px;border-radius:10px;background:#EEEEEE; display:block;" /></center>';
+  }
+
+  function fillFileMenu(el, path){
+    var list = ce("ul");
+    el.appendChild(list);
+    var action = ce("li");
+    list.appendChild(action);
+    if(isImageFile(path)){
+      action.innerHTML = "<span>Preview</span>";
+      action.onclick = function(e){
+        loadPreview(path);
+        if(document.body.getElementsByClassName('cm').length > 0) document.body.removeChild(el);
+      };
+    } else if(isTextFile(path)){
+      action.innerHTML = "<span>Edit</span>";
+      action.onclick = function(e){
+      editor.loadUrl(path);
+        if(document.body.getElementsByClassName('cm').length > 0) document.body.removeChild(el);
+      };
+    }
+    var download = ce("li");
+    list.appendChild(download);
+    download.innerHTML = "<span>Download</span>";
+    download.onclick = function(e){
+      loadDownload(path);
+      if(document.body.getElementsByClassName('cm').length > 0) document.body.removeChild(el);
+    };
+    var delFile = ce("li");
+    list.appendChild(delFile);
+    delFile.innerHTML = "<span>Delete</span>";
+    delFile.onclick = function(e){
+      httpDelete(path);
+      if(document.body.getElementsByClassName('cm').length > 0) document.body.removeChild(el);
+    };
+  }
+
+  function showContextMenu(event, path, isfile){
+    var divContext = ce("div");
+    var scrollTop = document.body.scrollTop ? document.body.scrollTop : document.documentElement.scrollTop;
+    var scrollLeft = document.body.scrollLeft ? document.body.scrollLeft : document.documentElement.scrollLeft;
+    var left = event.clientX + scrollLeft;
+    var top = event.clientY + scrollTop;
+    divContext.className = 'cm';
+    divContext.style.display = 'block';
+    divContext.style.left = left + 'px';
+    divContext.style.top = top + 'px';
+    fillFileMenu(divContext, path);
+    document.body.appendChild(divContext);
+    var width = divContext.offsetWidth;
+    var height = divContext.offsetHeight;
+    divContext.onmouseout = function(e){
+      if(e.clientX < left || e.clientX > (left + width) || e.clientY < top || e.clientY > (top + height)){
+        if(document.body.getElementsByClassName('cm').length > 0) document.body.removeChild(divContext);
+      }
+    };
+  }
+
+  function sortJSON(data, key, way) {
+    if (data) return data.sort(function(a, b) {
+              var x = a[key]; var y = b[key];
+        if (way === '123' ) { return ((x < y) ? -1 : ((x > y) ? 1 : 0)); }
+        if (way === '321') { return ((x > y) ? -1 : ((x < y) ? 1 : 0)); }
+    });
+  }
+
+  
+  function createTreeLeaf(path, name, islast=false, isfirst=false, fsize=0){
+      var leaf = ce("li"); leaf.id = path;
+      var label = ce("span");
+        label.innerHTML = name;
+  //      label.style="width:200px;border:solid 1px;display:block";
+        colr="color:#959595;"; 
+        if(isImageFile(leaf.id.toLowerCase())) colr="color:#88daf8;"; else if(isTextFile(leaf.id.toLowerCase())) colr=""; 
+        leaf.style = colr;
+        if (islast) leaf.style = colr+"width:1px;background: #FCFCFC url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAUCAMAAACzvE1FAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAAGUExURcLCwv///7ZovVQAAAACdFJOU/8A5bcwSgAAAB1JREFUeNpiYIQABkZ0BrrA4FEBhThVDLQAQIABAM2WATdn1kGLAAAAAElFTkSuQmCC') no-repeat;"; //xl.png
+//        leaf.title=fsize.toString().replace(/(\d*)(\d{3})(\d{3})$/g, "$1 $2 $3")+' bytes';
+        leaf.title=fsize.toString()+' bytes';
+        leaf.appendChild(label);
+//        label.style='';label.innerHTML=fsize;
+//        leaf.appendChild(label);
+
+//        if (name=='index.html') alert(leaf.innerHTML);
+//      top.xinfo[0]=top.xinfo[0].replace(/(\d*)(\d{3})(\d{3})$/g, "$1 $2 $3");
+
+      leaf.onclick = function(e){
+      if(isTextFile(leaf.id.toLowerCase())){
+        editor.loadUrl(leaf.id);
+      } else if(isImageFile(leaf.id.toLowerCase())){
+        loadPreview(leaf.id);
+      }
+    };
+    leaf.oncontextmenu = function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      showContextMenu(e, leaf.id, true);
+    };
+
+    return leaf;
+  }
+
+  
+  xstack=Array();
+  
+  function createTreeDir(allDir, path, name, islast=false, isfirst=false,fsize=0) {
+
+          var leaf = ce("li");
+          var check = ce("input");
+          var div = ce("div");
+            div.className='clDir';
+
+          check.type = "checkbox";
+          check.id = path;
+
+        
+          if (islast) leaf.style = "background: #FFFFFF url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAUCAMAAACzvE1FAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAAGUExURcLCwv///7ZovVQAAAACdFJOU/8A5bcwSgAAAB1JREFUeNpiYIQABkZ0BrrA4FEBhThVDLQAQIABAM2WATdn1kGLAAAAAElFTkSuQmCC') no-repeat;"; //xl.png
+          
+          
+          if(typeof disabled !== "undefined" && disabled) check.disabled = "disabled";
+          leaf.appendChild(check);
+          var label = document.createElement("label");
+          label.for = check.id;
+          label.textContent = name;
+          leaf.title=fsize.toString()+' bytes';
+            leaf.appendChild(label);
+
+
+          items = allDir[path];
+          
+          if (items) {
+
+            for (i=0;i<items.length;i++) {
+                
+
+            
+                if (items[i].type=='dir') {              
+                  xstack.push(items); xstack.push(i);
+
+                  div.appendChild(createTreeDir(allDir,items[i].path, items[i].name,(i==items.length-1),false,items[i].size));                          
+
+                  i = xstack.pop();items = xstack.pop();
+                    
+                } else {
+                  div.appendChild(createTreeLeaf('/'+items[i].path, items[i].name,(i==items.length-1),false,items[i].size));                          
+                }
+              
+            }
+          }
+          
+          
+          leaf.appendChild(div);            
+
+          check.onchange = function(e){
+            if(check.checked)
+            leaf.childNodes[2].className = "opDir";            
+            else
+            leaf.childNodes[2].className = "clDir";            
+
+          };
+          
+          
+          
+          label.onclick = function(e){
+            if(!check.checked){
+              check.checked = true;
+              leaf.childNodes[2].className = "opDir";            
+            } else {
+              check.checked = false;
+              leaf.childNodes[2].className = "clDir";            
+            }
+          };
+          leaf.oncontextmenu = function(e){
+            e.preventDefault();
+            e.stopPropagation();
+            showContextMenu(e, check.id, false);
+          }
+
+    return leaf;
+  }
+  
+  
+  sortDir = Array();
+  
+  dirSize = Array();
+  
+  ssdd = true;
+  
+  function createDirs(items) {
+    var treeDir = Array();
+    
+    treeDir['/'] = Array();
+    
+    for (i=0;i<items.length;i++) {
+      if (items[i].name.match(/\//)) {
+        dirs = items[i].name.split('/');
+        items[i].path = items[i].name;
+        items[i].name = dirs.pop();
+        sdir = '';pdir='';
+        for (j=0;j<dirs.length;j++) {
+          sdir = sdir+'/'+dirs[j];
+          if (!treeDir[sdir]) {
+            treeDir[sdir] = Array();
+            if (pdir) treeDir[pdir].push({name:dirs[j],path:sdir,type:'dir',size:0}); else treeDir['/'].push({name:dirs[j],path:sdir,type:'dir',size:0});
+            sortDir.push(sdir);
+          }
+          pdir = sdir;
+        }
+        
+        treeDir[sdir].push(items[i]);
+        if (!dirSize[sdir]) dirSize[sdir]=0;
+        dirSize[sdir] += parseInt(items[i].size);
+      } else {
+          items[i].path = items[i].name;
+          treeDir['/'].push(items[i]);
+      }
+    }
+
+//    alert(dirSize.length);
+
+    treeDir['/'] = sortJSON(treeDir['/'],'path','123');
+    sortDir.sort();sortDir.push('/');
+
+//alert(treeDir.length);
+    return treeDir;
+  }
+
+  function addList(parent, path, items){
+    if (path=='!!!---!!!') return;
+    var list = ce("ul");
+    parent.appendChild(list);
+    treeDir = createDirs(items);
+    items = treeDir['/'] ;
+    for(i=0;i<sortDir.length;i++) treeDir[sortDir[i]] = sortJSON(treeDir[sortDir[i]],'path','123');
+    for(var i = 0; i < items.length; i++){
+
+    if(items[i].type == "info") {
+      top.xinfo = items[i].name.split("|");
+      top.xinfo[2]=top.xinfo[0]-top.xinfo[1];
+      top.xinfo[2]=top.xinfo[2].toString().replace(/(\d*)(\d{3})(\d{3})$/g, "$1 $2 $3");
+      top.xinfo[0]=top.xinfo[0].replace(/(\d*)(\d{3})(\d{3})$/g, "$1 $2 $3");
+      top.xinfo[1]=top.xinfo[1].replace(/(\d*)(\d{3})(\d{3})$/g, "$1 $2 $3");
+      ge('_space').innerHTML=top.xinfo[2]+'b';
+
+      continue;
+    } 
+    
+      
+      if(items[i].type == "file") {
+        list.appendChild(createTreeLeaf('/'+items[i].path, items[i].name,(i==items.length-1),false,items[i].size));
+      } else {
+        
+        list.appendChild(createTreeDir(treeDir,items[i].path, items[i].name,(i==items.length-1),false,dirSize[items[i].path]));      
+      }
+    }
+  }
+
+  function isTextFile(path){
+    var ext = /(?:\.([^.]+))?$/.exec(path)[1];
+    if(typeof ext !== undefined){
+      switch(ext){
+        case "txt":
+        case "htm":
+        case "html":
+        case "js":
+        case "css":
+        case "csv":
+        case "log":
+        case "xml":
+        case "json":
+        case "conf":
+        case "iftt":
+        case "ini":
+        case "h":
+        case "c":
+        case "cpp":
+        case "php":
+        case "hex":
+        case "ino":
+          return true;
+      }
+    }
+    return false;
+  }
+
+  function isImageFile(path){
+    var ext = /(?:\.([^.]+))?$/.exec(path)[1];
+    if(typeof ext !== undefined){
+      switch(ext){
+        case "png":
+        case "jpg":
+        case "gif":
+          return true;
+      }
+    }
+    return false;
+  }
+
+  this.refreshPath = function(path){
+    treeRoot.removeChild(treeRoot.childNodes[0]);
+    httpGet(treeRoot, "/");
+  };
+
+  function delCb(path){
+    return function(status, responseText){
+      if(status != 200){
+        alert("ERROR["+status+"]: "+responseText);
+      } else {
+        treeRoot.removeChild(treeRoot.childNodes[0]);
+        httpGet(treeRoot, "/");
+      }
+    }
+  }
+
+  function httpDelete(filename){
+    var formData = new FormData();
+    formData.append("path", filename);
+    requests.add("DELETE", "/admin/edit/", formData, delCb(filename));
+  }
+
+  function getCb(parent, path){
+    return function(status, responseText){
+      if(status == 200)
+        addList(parent, path, JSON.parse(responseText));
+    }
+  }
+
+  function httpGet(parent, path){
+    if (top.xrefr) { requests.add("GET", "/_data", { list: path, ref: 1 }, getCb(parent, path)); top.xrefr=0;}
+    else requests.add("GET", "/_data", { list: path }, getCb(parent, path));
+
+  }
+
+  httpGet(treeRoot, "/");
+  return this;
+}
+
+function createEditor(element, file, lang, theme, type){
+
+  function getLangFromFilename(filename){
+    var lang = "plain";
+    var ext = /(?:\.([^.]+))?$/.exec(filename)[1];
+    if(typeof ext !== undefined){
+      switch(ext){
+        case "txt": lang = "plain"; break;
+        case "hex": lang = "plain"; break;
+        case "conf": lang = "plain"; break;
+        case "iftt": lang = "plain"; break;
+        case "htm": lang = "html"; break;
+        case "js": lang = "javascript"; break;
+        case "h": lang = "c_cpp"; break;
+        case "c": lang = "c_cpp"; break;
+        case "cpp": lang = "c_cpp"; break;
+        case "ino": lang = "c_cpp"; break;
+        case "log": lang = "plain";break;
+        case "css":
+        case "scss":
+        case "php":
+        case "html":
+        case "json":
+        case "xml":
+        case "ini":
+          lang = ext;
+      }
+    }
+    return lang;
+  }
+
+  if(typeof file === "undefined") file = "/index.html";
+
+  if(typeof lang === "undefined"){
+    lang = getLangFromFilename(file);
+  }
+
+  if(typeof theme === "undefined") theme = "textmate";
+
+  if(typeof type === "undefined"){
+    type = "text/"+lang;
+    if(lang === "c_cpp") type = "text/plain";
+  }
+
+  var editor = ace.edit(element);
+  function httpPostProcessRequest(status, responseText){
+    if(status != 200) alert("ERROR["+status+"]: "+responseText);
+  }
+  function httpPost(filename, data, type){
+    var formData = new FormData();
+    formData.append("data", new Blob([data], { type: type }), filename);
+    requests.add("POST", "/admin/edit/", formData, httpPostProcessRequest);
+  }
+  function httpGetProcessRequest(status, responseText){
+      ge("preview").style.display = "none";
+      ge("editor").style.display = "block";
+      if(status == 200)
+        editor.setValue(responseText);
+      else
+        editor.setValue("");
+      editor.clearSelection();
+      editor.focus();
+      editor.gotoLine(1);
+      
+  }
+  function httpGet(theUrl, path=''){
+      requests.add("GET", "/admin/edit/", { edit: theUrl }, httpGetProcessRequest);
+  }
+
+  if(lang !== "plain") editor.getSession().setMode("ace/mode/"+lang);
+  editor.setTheme("ace/theme/"+theme);
+  editor.$blockScrolling = Infinity;
+  editor.getSession().setUseSoftTabs(true);
+  editor.getSession().setTabSize(2);
+  editor.setHighlightActiveLine(true);
+  editor.setShowPrintMargin(false);
+  editor.commands.addCommand({
+      name: 'saveCommand',
+      bindKey: {win: 'Ctrl-S',  mac: 'Command-S'},
+      exec: function(editor) {
+        httpPost(file, editor.getValue()+"", type);
+      },
+      readOnly: false
+  });
+  editor.commands.addCommand({
+      name: 'save2Command',
+      bindKey: {win: 'F2',  mac: 'F2'},
+      exec: function(editor) {
+        httpPost(file, editor.getValue()+"", type);
+      },
+      readOnly: false
+  });
+  editor.commands.addCommand({
+      name: 'undoCommand',
+      bindKey: {win: 'Ctrl-Z',  mac: 'Command-Z'},
+      exec: function(editor) {
+        editor.getSession().getUndoManager().undo(false);
+      },
+      readOnly: false
+  });
+  editor.commands.addCommand({
+      name: 'redoCommand',
+      bindKey: {win: 'Ctrl-Shift-Z',  mac: 'Command-Shift-Z'},
+      exec: function(editor) {
+        editor.getSession().getUndoManager().redo(false);
+      },
+      readOnly: false
+  });
+  ge('saveButton').style='top:5px';
+  httpGet(file);
+  editor.loadUrl = function(filename, path){
+    file = filename;
+    lang = getLangFromFilename(file);
+    type = "text/"+lang;
+    if(lang !== "plain") editor.getSession().setMode("ace/mode/"+lang);
+    httpGet(file);
+  };
+  top.xtype=type;
+  top.xfile=file;
+  top.xe = editor;  
+  return editor;
+}
+function onBodyLoad(){
+  var vars = {};
+  var parts = window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi, function(m,key,value) { vars[key] = value; });
+  var editor = createEditor("editor", vars.file, vars.lang, vars.theme);
+  var tree = createTree("tree", editor);
+  createFileUploader("uploader", tree, editor);
+  
+};
+
+function resizeIt(a) {
+  x = a.clientX;
+  if (!x) return;
+  xx = (x-3)+'px';
+  xy = (x+5)+'px';
+  ge("tree").style.width=xx;
+  ge("editor").style.left=xy;  
+  ge("resizer").style.left=xx;
+}
+top.xinfo = Array();
+function dhide(a) {
+  setTimeout(function(){a.style='top:5px;'},3000);
+}
+</script>
+<!--
+<script src="/ace/ace.js" type="text/javascript" charset="utf-8"></script>
+//-->
+<script src="http://cdnjs.cloudflare.com/ajax/libs/ace/1.2.6/ace.js" type="text/javascript" charset="utf-8"></script>
+</head>
+
+<body onload="onBodyLoad();">
+  <div id="loader" class="loader"><center><div class=xloader></div></center></div>
+  <div id="uploader"></div>
+  <div id="saveButton" onclick="top.xe.focus();xe.execCommand('saveCommand');this.style='top:2px;';" onmouseover="this.style='top:21px;'" onmouseout ="dhide(this)" style='position:absolute;float:right'>Save File</div>
+  <div id="tree"></div>
+  <div id="resizer" ondrag='resizeIt(event)'></div>  
+  <div id="editor"></div>
+  <div id="preview" style="display:none;"></div>
+  <iframe id="download_frame" style='display:none;'></iframe>
+</body>
+</html>

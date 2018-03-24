@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+
+  <link href="http://ponika.org/i/css/bootstrap.css" type="text/css" rel="stylesheet">
+  <link href="http://ponika.org/i/ace/styles.css" type="text/css" rel="stylesheet">
+ 
+    <style type="text/css" media="screen">
+     body {
+      margin:0;
+      padding:0;
+      background-color: black;
+    }
+
+  </style>
+
+    <script type="text/javascript" src="http://ponika.org/i/ace/jquery-2.2.4.js"></script>
+
+    <script type="text/javascript">
+  
+    function ge(s){ return document.getElementById(s);}
+    function ce(s){ return document.createElement(s);}
+
+  
+    </script>
+
+<script type='text/javascript'>//<![CDATA[
+var chart;
+top.xsensors = Array();
+top.secs = 0;
+top.maxsecs=180;
+top.loaded = false;
+$(function () {
+  
+    $(document).ready(function () {
+
+      $.get('/online', function(data) {
+
+        Highcharts.setOptions({
+            global: {
+                useUTC: false
+            }
+        });
+        
+        Highcharts.setOptions({
+                colors: ['#7cb5ec', '#336699', '#90ed7d', '#f7a35c', '#8085e9','#f15c80', '#e4d354', '#2b908f', '#f45b5b', '#91e8e1'],
+        });
+        
+         window.chart = Highcharts.chart('container', {
+            chart: {
+                type: 'spline',
+                animation: Highcharts.svg, // don't animate in old IE
+                marginRight: 10,
+                backgroundColor: '#333',
+                zoomType : "x",
+                events: {
+                      load: function () {
+
+                        var timerId = setTimeout(function() { xdo(top.achart);top.loaded=true;}, 300);
+                        var xser = Array();
+                            j=0;
+                        for (i in top.sensors) {
+                              this.addSeries({
+                                name: i,
+                                type : top.sstype,
+                                visible : false,
+                        });
+                               top.xsensors[i]=j;
+                               top.sensid[top.sensors[i][2]]=j;
+                               j++;
+                        }
+                        
+                        for(var i=0;i<this.series.length;i++) {
+                          xser[i]=this.series[i];
+                        };
+            
+            
+                        setInterval(function () {
+                          
+                            top.secs++;
+                            
+
+                            if (top.maxsecs>0 && top.secs>top.maxsecs) {
+                                    top.secs--;  
+                                  for (i=0;i<chart.series.length;i++) chart.series[i].removePoint(0);
+                            }
+
+                            var x = (new Date(top.stime*1000)).getTime();
+
+                            for(var i=0;i<xser.length;i++) {
+
+                            if (top.sensors[xser[i].name][0]!=-1) {
+                                y = parseFloat(top.ssens[top.sensors[xser[i].name][2]]);
+
+                              xser[i].addPoint([x, y], true, false);
+                              ge("_"+xser[i].name).innerHTML=y;
+                            }  
+    
+                            if (top.achart && top.relsens[top.achart] && top.relsens[top.achart].length) {
+                            
+                                    flag=false; 
+
+                                    for (j=0;j<top.relsens[top.achart].length;j++) {
+                                    
+                                      if (top.relays[top.relsens[top.achart][j]]) {flag=true;pin = top.relsens[top.achart][j] ; break;}
+                                   }
+
+                                  if (flag) 
+                                  chart.xAxis[0].addPlotBand({
+                                    from: x,
+                                    to: x+1000,
+                                    color: 'brown',
+                                    id: 'pin_'+pin
+                                    });
+                                    
+                                }                            
+                            }
+                             
+                        }, 1000);
+                      }
+                  }
+            },
+
+            title: {
+                style: {'color' : '#F0F0F0',
+                        'display':'none',
+                },
+                text: 'Ponika One (sensors prototype)',
+            },
+            credits: {enabled:false},
+            xAxis: {
+                type: 'datetime',
+                tickPixelInterval: 50,
+
+                 plotBands: [{
+                  from: Date(top.stime),
+                  to: Date(top.stime+20),
+
+                  color: 'rgba(68, 170, 213, .2)'
+                    }],
+            },
+            yAxis: {
+          
+                title: {
+                    text: '',
+                    style: {'color' : '#F0F0F0'},
+                },
+                plotLines: [{
+                    value: 0,
+                    width: 1,
+                    color: '#FFF',
+                }]
+            },
+            tooltip: {
+                xDateFormat: '%Y-%m-%d %H:%M:%S',
+                pointFormat: '<span style="font-weight:bold;color:{series.color}">{series.name}</span>: <b>{point.y}</b> ({point.change})<br/>',
+              },
+            legend: {
+                enabled: true,
+                borderRadius: 7,
+                backgroundColor:'#222222',
+                itemStyle: {
+                    fontSize:'12px',
+                    margin:'0px',
+                }
+            },
+            plotOptions:{
+                series:{
+//                  compare: 'percent',
+                  compare: 'value',
+                }
+//                  showInNavigator: true,
+//                  compareBase: 100,
+
+//                turboThreshold:2000//set it to a larger threshold, it is by default to 1000
+                },
+            exporting: {
+                enabled: false
+            }
+        });
+        
+        
+        lines = data.split("\n");
+//alert(lines);
+        for (i=0;i<lines.length;i++) {
+          a = lines[i].split("|");
+          x = (new Date((a[0])*1000)).getTime();
+//                            var x = (new Date()).getTime();
+//alert(top.stime+":"+a[0]);
+//alert(x+":"+a[0]);
+          for (j=2;j<a.length;j++) {
+              yy = a[j].split(":");
+              y = parseFloat(yy[1]);
+              xx = x;
+//              alert(yy[0]+":"+x+":"+y);
+//              chart.series[top.sensid[yy[0]]].addPoint(x,parseFloat(yy[1]));
+              for (c=0;c<5;c++) {
+                
+              chart.series[top.sensid[yy[0]]].addPoint([xx, y], true, false);
+              xx = xx+1000;
+              }
+
+//            alert(chart);            
+            
+          }
+          top.secs=60;
+        };
+        
+
+        
+        
+        
+        
+    });
+    
+
+});
+});
+
+
+//]]> 
+
+
+oldb='';
+
+function xdo(a) {
+top.achart = a;b = ge('__'+a);
+ if (oldb) oldb.style = "background:#F0F0F0;color:black";
+  b.style = "background:#6699FF;color:white";
+oldb=b;olda=a;
+
+    for (i=0;i<chart.series.length;i++) {
+    var sss = chart.series[i];
+      sss.hide();
+    }
+chart.series[top.xsensors[a]].show();
+}
+</script>
+
+
+<style>
+th{font-weight:normal;
+}
+td{background:#555555;}
+.hdr{
+  font-size:16px;
+  cursor:pointer;
+  background:#F0F0F0;
+  color:black;
+  display:block;
+  padding:5px 5px 0 5px;
+  border:solid #555555 1px;
+  font-family:MS Sans serif;
+  white-space:nowrap;
+  text-align:center;
+
+  
+}
+.dd {
+  font-size:20px;
+  padding:0px 3px 3px 3px;
+  background:#000;
+  border:solid #555555 1px;
+  min-width:84px;
+  font-family:MS Sans serif;
+  
+  
+}
+
+</style>
+</head>
+
+<body id="body">
+<script src="http://ponika.org/i/ace/highstock.js"></script>
+
+<table cellspacing=0 cellpadding=0 width=100% border=0 style='margin:0;padding:0;color:white;font-family:MS Sans seris;text-align:center;border:0;'>
+  <tr valign=top>
+  <th width=235px><div class=hdr style='text-align:right;padding-right:0px'>
+    <input type=radio name=ratio value=60 onclick='top.maxsecs=this.value'>1M
+    <input type=radio name=ratio value=180 onclick='top.maxsecs=this.value' checked>3M
+    <input type=radio name=ratio value=600 onclick='top.maxsecs=this.value'>10M
+    <input type=radio name=ratio value=-1 onclick='top.maxsecs=this.value'>ALL
+
+    &nbsp;&nbsp;</div></th>
+<script>
+for(i in top.sensors) {
+document.write("<th><div class=hdr onclick=\"xdo('"+i+"')\" id=\"__"+i+"\">"+top.sensors[i][3]+"</div></th>");    
+}
+</script>
+</tr><tr>
+  <td class=dd id='_gdate' style='background-color:#333;text-align:right;padding-right:10px;white-space:nowrap;'>00:00:00</td>
+<script>
+  
+for(i in top.sensors) {
+document.write("<td class=dd id='_"+i+"'>0</td>");    
+}
+
+
+</script>
+</tr>
+</table>
+<div id="container" style="width:100%;min-width: 310px; top:63px; margin: 0 auto;position:absolute;bottom:0"></div>
+<script>top.loaded=true;</script>
+  </body>
+</html>

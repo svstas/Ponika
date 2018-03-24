@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html>
+  <head>
+  <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+  <link href="http://ponika.org/i/css/bootstrap.css" type="text/css" rel="stylesheet">
+  <script type="text/javascript" src="http://ponika.org/i/ace/jquery-2.2.4.js"></script>
+
+<link rel="stylesheet" href="/ace/jquery-ui.css">
+<link href="http://ponika.org/i/ace/styles.css" type="text/css" rel="stylesheet">
+   
+<script type='text/javascript'>//<![CDATA[
+
+    function ge(s){ return document.getElementById(s);}
+    function ce(s){ return document.createElement(s);}
+
+ top.relName = Array();
+ top.relName[0] = ["HOT","red"];
+ top.relName[1] = ["COOL","blue"];
+ top.relName[2] = ["HUM","green"];
+ top.relName[3] = ["NONE","#555555"];
+
+ top.rdata = Array();
+ top.xsensors = Array();
+ top.sensid=Array();
+
+// for(i=0;i<20;i++) top.rdata[i] = Array();
+ //top.marked = Array();
+ var chart;
+ top.marks = Array();
+ top.colors = Array('red','blue','green','brown','yellow','black','magenta','#006699');
+
+$(function () {
+
+  $(document).ready(function () {
+      
+  top.loaded=false;
+  top.rdata['mem'] = Array();
+  top.reldata = Array();
+  $.get('/data/'+top.lname+'.txt', function(data) {
+  var j=0;for (i in top.sensors) {top.xsensors[top.sensors[i][2]]=i;top.sensid[i]=j; j++;};
+  var xrels = Array();
+  var rstat = Array(false,false,false,false,false,false,false,false);
+  var rproc = Array(0,0,0,0,0,0,0,0);
+  var lines = data.replace(/\n+$/,'').split('\n');
+  var realdata = false;
+
+        $.each(lines, function(lineNo, line) {
+
+            var items = line.split('|');
+            items[0] = items[0]-3600*2;
+            tm = (new Date(items[0]*1000)).getTime();
+            for(i=1;i<items.length;i++) {
+            res = items[i].split(":");
+            id = res[0];val = res[1];
+
+            if (id>299) {
+                pin = id-300;
+            if (val==1) {
+                rproc[pin]=tm;
+                rstat[pin]=true;
+                
+            } else {
+              
+                if (rstat[pin])  {
+                  rstat[pin]=false;
+                  top.marks.push({pin : pin, start : rproc[pin], end : tm});
+                  if (!realdata) realdata = id;
+                  rproc[pin]=0;
+                }             
+              
+            }
+
+            } else {
+
+            xid = top.xsensors[id];
+              if (!top.rdata[xid]) top.rdata[xid]=Array();
+                top.rdata[xid].push({x : tm, y : parseFloat(val)});
+              }
+            }
+
+            if (lineNo==lines.length-1) for (i=0;i<8;i++) if (rstat[i]) top.marks.push({pin : i, start : rproc[i], end : tm});
+
+        });
+ 
+        
+      
+        
+        Highcharts.setOptions({
+                colors: ['#7cb5ec', '#336699', '#90ed7d', '#f7a35c', '#8085e9','#f15c80', '#e4d354', '#2b908f', '#f45b5b', '#91e8e1'],
+        });
+        
+
+        
+        window.chart = new Highcharts.stockChart('container', {
+
+            chart: {
+              type: 'areaspline',
+              backgroundColor: '#333',
+              marginRight: 20,
+              events: {
+                      load: function () {
+                        for (i in top.sensors) {
+                          if (!top.rdata[i]) {ge("__"+i).className='hdroff';ge("__"+i).onclick='return false';}
+                          this.addSeries({
+                              name: top.sensors[i][3],
+                              type : top.sstype,
+                              visible : false,
+                              data: top.rdata[i]
+                        });
+                        
+                      };
+
+//                        alert(chart.navigator);                        
+                          var timerId = setTimeout(function() {
+                            
+                                for (i in top.sensid) {
+                                      chart.series[top.sensid[i]].show();
+                                      chart.series[top.sensid[i]].hide();
+                                }
+                                xdo(top.achart)}, 500);
+
+
+                          },
+                      
+                      
+                      
+                    redraw : function() {
+                      if (chart) {
+
+//                        alert(top.achart);
+//                        alert(chart.get('nav').data.length);
+//                        chart.get('nav').setData(top.rdata[top.achart]);
+//                        alert(chart.rangeSelector.selected);
+                        top.rangeSelector = chart.rangeSelector.selected;
+//                        alert(chart.navigator);
+//                        alert(top.rdata[top.achart]);
+                  
+//                        this.navigator.setData(top.rdata[top.achart]);
+//                        chart.xAxis[0].removePlotBand('pin_3');
+//                        chart.xAxis[0].removePlotBand('pin_2');
+//                        chart.xAxis[0].removePlotBand('pin_1');
+//                        chart.xAxis[0].removePlotBand('pin_0');
+                        
+                      }
+                    }
+                      
+              }
+              
+              
+              
+            },
+
+            rangeSelector: {
+              inputBoxBorderColor: '#FFF',
+              inputEnabled:false,
+                selected: top.rangeSelector,
+                buttons: [
+                {type: 'minute',count: 5,text: '5m'},
+                {type: 'minute',count: 10,text: '15m'},
+                {type: 'minute',count: 30,text: '30m'},
+                {type: 'hour',count: 1,text: '1h'},
+                {type: 'hour',count: 3,text: '3h'},
+                {type: 'hour',count: 6,text: '6h'},
+                {type: 'hour',count: 12,text: '12h'},
+                {type: 'day',count: 1,text: '1d'},
+
+                    { 
+                      type: 'all',
+	                    text: 'All'
+                  }],                
+            },
+              navigator: {
+                  height: 50,
+                  margin: 10,
+                  enabled: true,
+                          handles: {
+                              backgroundColor: 'yellow',
+                              borderColor: 'red'
+                        },
+//                  maskFill: 'rgba(255, 255, 233, 0.4)',
+                  outlineWidth: 3,
+
+                series: {
+                    id: 'nav',
+//                  	type: 'spline',
+                    color: '#4572A7',
+                  	fillOpacity: 0.05,
+	                    dataGrouping: {
+                              		smoothed: true
+	                    },
+                  	lineWidth: 1,
+                  	marker: {
+                      		enabled: false
+	                   }
+                },
+              margin:10,
+               },
+ 
+            legend: {
+                enabled: true,
+                borderRadius: 7,
+                backgroundColor:'#222222',
+                itemStyle: {
+                    fontSize:'12px',
+                    margin:'0px',
+                }
+            },
+
+            title: {
+                              
+                style: {'display' : 'none'},
+                text: 'Ponika One (sensors prototype)',
+            },
+
+            credits: {enabled:false},
+            xAxis: {
+                type: 'datetime',
+                tickPixelInterval: 150,
+                labels: {
+                  style: {
+                    color: '#F0F0F0'
+                  }
+                },
+            
+            },
+            yAxis: {
+                title: {
+                    text: '',
+                    style: {'color' : '#F0F0F0'},
+                    allowDecimals:false,
+                }, 
+                labels: {
+                  formatter: function () {
+  
+                    return (this.value > 0 ? ' + ' : '') + this.value;
+                  }
+                },
+                
+                plotLines: [{
+                    value: 0,
+                    width: 1,
+                    color: '#FFF',
+                }]
+            },
+
+
+//      tooltip: {
+//            pointFormat: '<span style="color:{series.color}">{series.name}</span>: <b>{point.y} USD</b> ({point.change} USD)<br/>',
+//            changeDecimals: 2,
+//            valueDecimals: 2
+//        },
+
+
+
+          tooltip: {
+                xDateFormat: '%Y-%m-%d %H:%M:%S',
+                pointFormat: '<span style="font-weight:bold;color:{series.color}">{series.name}</span>: <b>{point.y}</b> ({point.change})<br/>',
+//                formatter: function () {
+//                  return this.series+' - '+this.x;
+//                    if (this.series && this.series.name!=' ')
+//                    return '<b>' + top.achart + '</b><br/>' +
+//                        Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', this.x) + '<br/>' +
+//                        Highcharts.numberFormat(this.y, 2);
+//                }
+            },
+            legend: {
+                enabled: true,
+                borderRadius: 5,
+                backgroundColor:'#222222',
+                itemStyle: {
+                    fontSize:'12px',
+                },
+                style : 'font-family:MS Sans serif',
+            },
+            plotOptions:{
+                series:{
+//                  compare: 'percent',
+                  compare: 'value',
+                  showInNavigator: true,
+//                  compareBase: 100,
+
+                  turboThreshold:2000//set it to a larger threshold, it is by default to 1000
+                }
+            },
+  
+            exporting: {
+                enabled: true
+            },
+
+            }
+            
+            
+/*            
+            ,
+            
+            function(chart) {
+
+        
+chart.renderer.button('HOT', null, null, function(){ alert() }, {
+   zIndex: 20,
+   fill: 'red',
+   color: 'white'
+}).attr({
+   align: 'right',
+   title: 'Reset zoom level 1:1',
+   stroke: 'white',
+}).add().align({
+   align: 'right',
+   x: -10,
+   y: 0
+}, false, null);
+          
+          
+          
+        }
+        */  
+        
+        
+        
+/*        ,
+        
+        function(chart) { // on complete
+
+chart.renderer.button('HOT', null, null, function(){ alert() }, {
+   zIndex: 20,
+   fill: 'red',
+   color: 'white'
+}).attr({
+   align: 'right',
+   title: 'Reset zoom level 1:1',
+   stroke: 'white',
+}).add().align({
+   align: 'right',
+   x: -10,
+   y: 0
+}, false, null);
+
+
+/*
+chart.renderer.button("ok",chart.chartWidth-60, 0, alert,).attr({
+    fill: '#C5FFC5',
+    stroke: 'black',
+    'stroke-width': 1
+    text: {
+      
+    }
+}).add();
+
+}
+*/
+
+
+
+
+        
+        
+        );
+  });
+
+
+        Highcharts.setOptions({
+            global: {
+                useUTC: false
+            }
+        });
+
+
+
+
+    });
+    
+
+    
+});
+//]]> 
+
+
+oldb=0;
+top.oldchar=false;
+
+function chkpin(a,id) {
+  pins = top.sensors[a][1];
+  if (!pins) return false;
+  rr = pins.split(","); 
+  if (!rr.length) rr.push(pins);
+//  alert(">"+rr+":"+id+":"+);
+  
+  for (i=0;i<rr.length;i++) if (rr[i]==id) {alert(rr+":"+id);return true;}
+  return false;
+//  alert(rr);
+//  if (rr.indexOf(id)) alert(rr.indexOf(id)+":"+id+':'+rr);
+  //return true; else return false;
+}
+
+function xdo(a) {
+
+  if (top.marks) {
+  
+
+  xpins = top.sensors[a][1];
+for (i=0;i<8;i++)  chart.xAxis[0].removePlotBand('pin_'+i);
+
+if (xpins) {  
+
+pins = xpins.split(","); if (!pins.length) pins.push(xpins);
+for (i in top.marks) {
+    skip = true;
+  for (j in pins) if (top.marks[i].pin==(pins[j]-1)) {skip=false; continue;} 
+    if (skip) continue;
+
+      chart.xAxis[0].addPlotBand({
+        from: top.marks[i].start,
+        to: top.marks[i].end,
+        color: top.colors[top.marks[i].pin],
+        id: 'pin_'+top.marks[i].pin,
+        label: {text : "HOT"+top.marks[i].pin, style: {color:'white'}}
+    });
+}
+
+
+}  
+                      
+
+  
+}
+
+
+  top.rangeSelector = chart.rangeSelector.selected;
+  top.achart = a;
+//
+xxflag = false;
+b = ge('__'+a);
+
+ if (oldb) {
+   oldb.style = "background:#F0F0F0;color:black";
+ } 
+ 
+  b.style = "background:#6699FF;color:white";
+
+oldb=b;
+olda=a;
+
+
+//alert(a+":"+top.sensid[a]+":"+chart.series[top.sensid[a]]);
+//alert(chart.series[top.sensid[a]]);
+
+chart.series[top.sensid[a]].show();
+var xnn = chart.get('nav');
+//chart.get('nav').setData(top.rdata[a]);
+//alert(xnn+' - '+top.rdata[a]);
+//xnn.setData(top.rdata[a],true);
+
+//alert(chart.series[top.sensid[a]].options.data);
+xnn.setData(chart.series[top.sensid[a]].options.data,false);
+
+//navigator.setData(chart.series[index].options.data);
+if (top.oldchar) chart.series[top.sensid[top.oldchar]].hide();
+chart.xAxis[0].setExtremes();
+top.oldchar = a;
+}
+
+var chart;
+</script>
+
+
+<style>
+body{
+  background:#333333;
+  padding0;
+  align:center;
+}
+a{margin:5px;padding:10px;}
+th{font-weight:normal;}
+td{background:#555555;}
+.hdr,.hdroff{
+  font-size:16px;
+  cursor:pointer;
+  background:#F0F0F0;
+  color:black;
+  display:block;
+  padding:5px;
+  border:solid #555555 1px;
+  font-family:MS Sans serif;
+  white-space:nowrap;
+}
+.hdroff {
+  corsor:arrow;
+  color:#777777;
+}
+
+</style>
+<script src="http://ponika.org/i/ace/highstock.js"></script>
+
+</head>
+
+<body id="body" style='margin:0;padding:0'>
+<!--
+<script src="http://code.highcharts.com/stock/highstock.js"></script>
+
+//-->
+
+
+
+<table cellspacing=0 cellpadding=0 width=100% border=0 style='margin:0;padding:0;color:white;font-family:MS Sans seris;text-align:center;border:0;'>
+  <tr valign=top>
+    <script>
+for(i in top.sensors) {
+//  if (i=='mem') continue;
+
+ document.write("<th><div class=hdr onclick=\"xdo('"+i+"')\" id=\"__"+i+"\">"+top.sensors[i][3]+"</div></th>");    
+}
+</script>
+</tr>
+</table>
+<div id="container" style="position:absolute;right:0px;width:100%;min-width: 410px; top:54px; margin: 0 auto;bottom:0;"></div>
+  

@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">  
+  <link rel="stylesheet" type="text/css" media="screen" href="/admin/styles.css">
+<title>ESP Editor</title>
+<script>
+if (typeof XMLHttpRequest === "undefined") {
+  XMLHttpRequest = function () {
+    try { return new ActiveXObject("Msxml2.XMLHTTP.6.0"); } catch (e) {}
+    try { return new ActiveXObject("Msxml2.XMLHTTP.3.0"); } catch (e) {}
+    try { return new ActiveXObject("Microsoft.XMLHTTP"); } catch (e) {}
+    throw new Error("This browser does not support XMLHttpRequest.");
+  };
+}
+
+function ge(a){return document.getElementById(a);}
+function ce(a){return document.createElement(a);}
+function w(a){document.write(a);}
+
+var QueuedRequester = function () {
+  this.queue = [];
+  this.running = false;
+  this.xmlhttp = null;
+}
+
+QueuedRequester.prototype = {
+  _request: function(req){
+    this.running = true;
+    if(!req instanceof Object) return;
+    var that = this;
+    
+    function ajaxCb(x,d){ return function(){
+      if (x.readyState == 4){
+        ge("loader").style.display = "none";
+        d.callback(x.status, x.responseText);
+        if(that.queue.length === 0) that.running = false;
+        if(that.running) that._request(that.queue.shift());
+      }
+    }}
+    
+    ge("loader").style.display = "block";
+    
+    var p = "";
+    if(req.params instanceof FormData){
+      p = req.params;
+    } else if(req.params instanceof Object){
+      for (var key in req.params) {
+        if(p === "")
+          p += (req.method === "GET")?"?":"";
+        else
+          p += "&";
+        p += encodeURIComponent(key+"="+req.params[key]);
+      };
+    }
+    
+    this.xmlhttp = new XMLHttpRequest();
+    this.xmlhttp.onreadystatechange = ajaxCb(this.xmlhttp, req);
+    if(req.method === "GET"){
+      ge('saveButton').style='top:5px';
+      this.xmlhttp.open(req.method, req.url+p, true);
+      this.xmlhttp.send();
+    } else {
+      this.xmlhttp.open(req.method, req.url, true);
+      if(p instanceof String)
+        this.xmlhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+      this.xmlhttp.send(p);
+    }
+  },
+  stop: function(){
+    if(this.running) this.running = false;
+    if(this.xmlhttp && this.xmlhttp.readyState < 4){
+      this.xmlhttp.abort();
+    }
+  },
+  add: function(method, url, params, callback){
+    this.queue.push({url:url,method:method,params:params,callback:callback});
+    if(!this.running){
+      this._request(this.queue.shift());
+    }
+  }
+}
+var requests = new QueuedRequester();
+function createFileUploader(element, tree, editor){
+  var xmlHttp;
+  var logo = ce("div");
+//  logo.src = "";
+  logo.style = 'background:url(/admin/img/ponika.png) no-repeat;width:78px;height:20px;margin-top:5px;text-align:left;position:absolute;';
+  ge(element).appendChild(logo);
+  bar = ce("div");
+  bar.style = 'position:absolute;right:10px;top:5px;';
+  bar.innerHTML = "";//<a href='#' style='color:#A5A5A5' onclick='download_frame.src=\"/reset\";top.location=top.location;'>reset</a>";
+  ge(element).appendChild(bar);
+  var input = ce("input");
+  input.type = "file";
+  input.multiple = false;
+  input.name = "data";
+  input.style='padding-left:80px';
+  ge(element).appendChild(input);
+  var path = ce("input");
+  path.id = "upload-path";
+  path.type = "text";
+  path.name = "path";
+  path.defaultValue = "/";
+  ge(element).appendChild(path);
+  var button = ce("button");
+  button.innerHTML = 'Upload';
+  ge(element).appendChild(button);
+  var mkfile = ce("button");
+  mkfile.innerHTML = 'Create';
+  ge(element).appendChild(mkfile);
+
+  function httpPostProcessRequest(status, responseText){
+    if(status != 200)
+      alert("ERROR["+status+"]: "+responseText);
+    else
+      tree.refreshPath(path.value);
+  }
+  function createPath(p){
+    var formData = new FormData();
+    formData.append("path", p);
+    requests.add("PUT", "/admin/edit/", formData, httpPostProcessRequest);
+  }
+  
+  mkfile.onclick = function(e){
+    if(path.value.indexOf(".") === -1) return;
+    createPath(path.value);
+    editor.loadUrl(path.value);
+  };
+  button.onclick = function(e){
+    if(input.files.length === 0){
+      return;
+    }
+    var formData = new FormData();
+    formData.append("data", input.files[0], path.value);
+    requests.add("POST", "/admin/edit/", formData, httpPostProcessRequest);
+  };
+
+  input.onchange = function(e){
+    if(input.files.length === 0) return;
+    var filename = input.files[0].name;
+    var ext = /(?:\.([^.]+))?$/.exec(filename)[1];
+    var name = /(.*)\.[^.]+$/.exec(filename)[1];
+    if(typeof name !== undefined){
+      filename = name;
+    }
+    if(typeof ext !== undefined){
+      filename = filename + "." + ext;
+    }
+    if(path.value === "/" || path.value.lastIndexOf("/") === 0){
+      path.value = "/"+filename;
+    } else {
+      path.value = path.value.substring(0, path.value.lastIndexOf("/")+1)+filename;
+    }
+  };
+}
+
+/*
+HTMLElement.prototype.appendFirst=function(childNode){
+    if(this.firstChild)this.insertBefore(childNode,this.firstChild);
+    else this.appendChild(childNode);
+};
+
+*/
+
+function createTree(element, editor){
+  var preview = ge("preview");
+  var treeRoot = ce("div");
+//      treeRoot.innerHTML="<div class=\"plashka\">Files</div>";
+
+  treeRoot.className = "tvu";
+//  ge(element).appendChild(treeRoot);
+  ge(element).appendChild(treeRoot);
+
+  function loadDownload(path){
+    ge('download_frame').src = "/admin/edit/?download="+path;
+  }
+
+  function loadPreview(path){
+    ge("editor").style.display = "none";
+    preview.style.display = "block";
+    preview.innerHTML = '<center><img src="/admin/edit/?edit='+path+'&_cb='+Date.now()+'" style="max-width:100%;max-height:100%;padding:20px;margin:20px;border:solid 1px;border-radius:10px;background:#EEEEEE; display:block;" /></center>';
+  }
+
+  function fillFileMenu(el, path){
+    var list = ce("ul");
+    el.appendChild(list);
+    var action = ce("li");
+    list.appendChild(action);
+    if(isImageFile(path)){
+      action.innerHTML = "<span>Preview</span>";
+      action.onclick = function(e){
+        loadPreview(path);
+        if(document.body.getElementsByClassName('cm').length > 0) document.body.removeChild(el);
+      };
+    } else if(isTextFile(path)){
+      action.innerHTML = "<span>Edit</span>";
+      action.onclick = function(e){
+      editor.loadUrl(path);
+        if(document.body.getElementsByClassName('cm').length > 0) document.body.removeChild(el);
+      };
+    }
+    var download = ce("li");
+    list.appendChild(download);
+    download.innerHTML = "<span>Download</span>";
+    download.onclick = function(e){
+      loadDownload(path);
+      if(document.body.getElementsByClassName('cm').length > 0) document.body.removeChild(el);
+    };
+    var delFile = ce("li");
+    list.appendChild(delFile);
+    delFile.innerHTML = "<span>Delete</span>";
+    delFile.onclick = function(e){
+      httpDelete(path);
+      if(document.body.getElementsByClassName('cm').length > 0) document.body.removeChild(el);
+    };
+  }
+
+  function showContextMenu(event, path, isfile){
+    var divContext = ce("div");
+    var scrollTop = document.body.scrollTop ? document.body.scrollTop : document.documentElement.scrollTop;
+    var scrollLeft = document.body.scrollLeft ? document.body.scrollLeft : document.documentElement.scrollLeft;
+    var left = event.clientX + scrollLeft;
+    var top = event.clientY + scrollTop;
+    divContext.className = 'cm';
+    divContext.style.display = 'block';
+    divContext.style.left = left + 'px';
+    divContext.style.top = top + 'px';
+    fillFileMenu(divContext, path);
+    document.body.appendChild(divContext);
+    var width = divContext.offsetWidth;
+    var height = divContext.offsetHeight;
+    divContext.onmouseout = function(e){
+      if(e.clientX < left || e.clientX > (left + width) || e.clientY < top || e.clientY > (top + height)){
+        if(document.body.getElementsByClassName('cm').length > 0) document.body.removeChild(divContext);
+      }
+    };
+  }
+
+  function sortJSON(data, key, way) {
+    if (data) return data.sort(function(a, b) {
+              var x = a[key]; var y = b[key];
+        if (way === '123' ) { return ((x < y) ? -1 : ((x > y) ? 1 : 0)); }
+        if (way === '321') { return ((x > y) ? -1 : ((x < y) ? 1 : 0)); }
+    });
+  }
+
+  
+  function createTreeLeaf(path, name, islast=false, isfirst=false, fsize=0){
+      var leaf = ce("li"); leaf.id = path;
+      var label = ce("span");
+        label.innerHTML = name;
+  //      label.style="width:200px;border:solid 1px;display:block";
+        colr="color:#959595;"; 
+        if(isImageFile(leaf.id.toLowerCase())) colr="color:#88daf8;"; else if(isTextFile(leaf.id.toLowerCase())) colr=""; 
+        leaf.style = colr;
+        if (islast) leaf.style = colr+"width:1px;background: #FCFCFC url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAUCAMAAACzvE1FAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAAGUExURcLCwv///7ZovVQAAAACdFJOU/8A5bcwSgAAAB1JREFUeNpiYIQABkZ0BrrA4FEBhThVDLQAQIABAM2WATdn1kGLAAAAAElFTkSuQmCC') no-repeat;"; //xl.png
+//        leaf.title=fsize.toString().replace(/(\d*)(\d{3})(\d{3})$/g, "$1 $2 $3")+' bytes';
+        leaf.title=fsize.toString()+' bytes';
+        leaf.appendChild(label);
+//        label.style='';label.innerHTML=fsize;
+//        leaf.appendChild(label);
+
+//        if (name=='index.html') alert(leaf.innerHTML);
+//      top.xinfo[0]=top.xinfo[0].replace(/(\d*)(\d{3})(\d{3})$/g, "$1 $2 $3");
+
+      leaf.onclick = function(e){
+      if(isTextFile(leaf.id.toLowerCase())){
+        editor.loadUrl(leaf.id);
+      } else if(isImageFile(leaf.id.toLowerCase())){
+        loadPreview(leaf.id);
+      }
+    };
+    leaf.oncontextmenu = function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      showContextMenu(e, leaf.id, true);
+    };
+
+    return leaf;
+  }
+
+  
+  xstack=Array();
+  
+  function createTreeDir(allDir, path, name, islast=false, isfirst=false,fsize=0) {
+
+          var leaf = ce("li");
+          var check = ce("input");
+          var div = ce("div");
+            div.className='clDir';
+
+          check.type = "checkbox";
+          check.id = path;
+
+          if (islast) leaf.style = "background: #FFFFFF url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAUCAMAAACzvE1FAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAAGUExURcLCwv///7ZovVQAAAACdFJOU/8A5bcwSgAAAB1JREFUeNpiYIQABkZ0BrrA4FEBhThVDLQAQIABAM2WATdn1kGLAAAAAElFTkSuQmCC') no-repeat;"; //xl.png
+          
+          if(typeof disabled !== "undefined" && disabled) check.disabled = "disabled";
+          leaf.appendChild(check);
+          var label = document.createElement("label");
+          label.for = check.id;
+          label.textContent = name;
+          leaf.title=fsize.toString()+' bytes';
+            leaf.appendChild(label);
+
+
+          items = allDir[path];
+          
+          if (items) {
+
+            for (i=0;i<items.length;i++) {
+                
+
+            
+                if (items[i].type=='dir') {              
+                  xstack.push(items); xstack.push(i);
+
+                  div.appendChild(createTreeDir(allDir,items[i].path, items[i].name,(i==items.length-1),false,items[i].size));                          
+
+                  i = xstack.pop();items = xstack.pop();
+                    
+                } else {
+                  div.appendChild(createTreeLeaf('/'+items[i].path, items[i].name,(i==items.length-1),false,items[i].size));                          
+                }
+              
+            }
+          }
+          
+          
+          leaf.appendChild(div);            
+
+          check.onchange = function(e){
+            if(check.checked)
+            leaf.childNodes[2].className = "opDir";            
+            else
+            leaf.childNodes[2].className = "clDir";            
+
+          };
+          
+          
+          
+          label.onclick = function(e){
+            if(!check.checked){
+              check.checked = true;
+              leaf.childNodes[2].className = "opDir";            
+            } else {
+              check.checked = false;
+              leaf.childNodes[2].className = "clDir";            
+            }
+          };
+          leaf.oncontextmenu = function(e){
+            e.preventDefault();
+            e.stopPropagation();
+            showContextMenu(e, check.id, false);
+          }
+
+    return leaf;
+  }
+  
+  
+  sortDir = Array();
+  
+  dirSize = Array();
+  
+  ssdd = true;
+  
+  function createDirs(items) {
+    var treeDir = Array();
+    
+    treeDir['/'] = Array();
+    
+    for (i=0;i<items.length;i++) {
+      if (items[i].name.match(/\//)) {
+        dirs = items[i].name.split('/');
+        items[i].path = items[i].name;
+        items[i].name = dirs.pop();
+        sdir = '';pdir='';
+        for (j=0;j<dirs.length;j++) {
+          sdir = sdir+'/'+dirs[j];
+          if (!treeDir[sdir]) {
+            treeDir[sdir] = Array();
+            if (pdir) treeDir[pdir].push({name:dirs[j],path:sdir,type:'dir',size:0}); else treeDir['/'].push({name:dirs[j],path:sdir,type:'dir',size:0});
+            sortDir.push(sdir);
+          }
+          pdir = sdir;
+        }
+        
+        treeDir[sdir].push(items[i]);
+        if (!dirSize[sdir]) dirSize[sdir]=0;
+        dirSize[sdir] += parseInt(items[i].size);
+      } else {
+          items[i].path = items[i].name;
+          treeDir['/'].push(items[i]);
+      }
+    }
+
+//    alert(dirSize.length);
+
+    treeDir['/'] = sortJSON(treeDir['/'],'path','123');
+    sortDir.sort();sortDir.push('/');
+
+//alert(treeDir.length);
+    return treeDir;
+  }
+
+  function addList(parent, path, items){
+    if (path=='!!!---!!!') return;
+    var list = ce("ul");
+    parent.appendChild(list);
+    treeDir = createDirs(items);
+    items = treeDir['/'] ;
+    for(i=0;i<sortDir.length;i++) treeDir[sortDir[i]] = sortJSON(treeDir[sortDir[i]],'path','123');
+    for(var i = 0; i < items.length; i++){
+
+    if(items[i].type == "info") {
+      top.xinfo = items[i].name.split("|");
+      top.xinfo[2]=top.xinfo[0]-top.xinfo[1];
+      top.xinfo[2]=top.xinfo[2].toString().replace(/(\d*)(\d{3})(\d{3})$/g, "$1 $2 $3");
+      top.xinfo[0]=top.xinfo[0].replace(/(\d*)(\d{3})(\d{3})$/g, "$1 $2 $3");
+      top.xinfo[1]=top.xinfo[1].replace(/(\d*)(\d{3})(\d{3})$/g, "$1 $2 $3");
+//      alert(ge('_space'));
+
+//      ge('_space').innerHTML="<span style='float:left'>Всего</span><span style='float:right'>"+top.xinfo[0]+"</span><br><span style='float:left'>Используется</span><span style='float:right'>"+top.xinfo[1]+"</span><br><span style='float:left'>Доступно</span><span style='float:right'>"+top.xinfo[2]+"</span>";
+      ge('_space').innerHTML=top.xinfo[2]+'b';
+
+      continue;
+    }
+      
+    
+      
+      if(items[i].type == "file") {
+  //      if (items[i].name=="index.html") alert(items[i].size);
+        list.appendChild(createTreeLeaf('/'+items[i].path, items[i].name,(i==items.length-1),false,items[i].size));
+  //      list.appendChild(createTreeLeaf('/'+items[i].path, items[i].name,(i==items.length-1)));
+      } else {
+        
+        list.appendChild(createTreeDir(treeDir,items[i].path, items[i].name,(i==items.length-1),false,dirSize[items[i].path]));      
+  //      list.appendChild(createTreeDir(treeDir,items[i].path, items[i].name,(i==items.length-1)));      
+      }
+    }
+  }
+
+  function isTextFile(path){
+    var ext = /(?:\.([^.]+))?$/.exec(path)[1];
+    if(typeof ext !== undefined){
+      switch(ext){
+        case "txt":
+        case "htm":
+        case "html":
+        case "js":
+        case "css":
+        case "csv":
+        case "log":
+        case "xml":
+        case "json":
+        case "conf":
+        case "ini":
+        case "h":
+        case "c":
+        case "cpp":
+        case "php":
+        case "hex":
+        case "ino":
+          return true;
+      }
+    }
+    return false;
+  }
+
+  function isImageFile(path){
+    var ext = /(?:\.([^.]+))?$/.exec(path)[1];
+    if(typeof ext !== undefined){
+      switch(ext){
+        case "png":
+        case "jpg":
+        case "gif":
+          return true;
+      }
+    }
+    return false;
+  }
+
+  this.refreshPath = function(path){
+    treeRoot.removeChild(treeRoot.childNodes[0]);
+    httpGet(treeRoot, "/");
+  };
+
+  function delCb(path){
+    return function(status, responseText){
+      if(status != 200){
+        alert("ERROR["+status+"]: "+responseText);
+      } else {
+        treeRoot.removeChild(treeRoot.childNodes[0]);
+        httpGet(treeRoot, "/");
+      }
+    }
+  }
+
+  function httpDelete(filename){
+    var formData = new FormData();
+    formData.append("path", filename);
+    requests.add("DELETE", "/admin/edit/", formData, delCb(filename));
+  }
+
+  function getCb(parent, path){
+    return function(status, responseText){
+      if(status == 200)
+        addList(parent, path, JSON.parse(responseText));
+    }
+  }
+
+  function httpGet(parent, path){
+    requests.add("GET", "/_data", { list: path }, getCb(parent, path));
+  }
+
+  httpGet(treeRoot, "/");
+  return this;
+}
+function createEditor(element, file, lang, theme, type){
+
+  function getLangFromFilename(filename){
+    var lang = "plain";
+    var ext = /(?:\.([^.]+))?$/.exec(filename)[1];
+    if(typeof ext !== undefined){
+      switch(ext){
+        case "txt": lang = "plain"; break;
+        case "hex": lang = "plain"; break;
+        case "conf": lang = "plain"; break;
+        case "htm": lang = "html"; break;
+        case "js": lang = "javascript"; break;
+        case "h": lang = "c_cpp"; break;
+        case "c": lang = "c_cpp"; break;
+        case "cpp": lang = "c_cpp"; break;
+        case "ino": lang = "c_cpp"; break;
+        case "log": lang = "plain";break;
+        case "css":
+        case "scss":
+        case "php":
+        case "html":
+        case "json":
+        case "xml":
+        case "ini":
+          lang = ext;
+      }
+    }
+    return lang;
+  }
+
+  if(typeof file === "undefined") file = "/index.html";
+
+  if(typeof lang === "undefined"){
+    lang = getLangFromFilename(file);
+  }
+
+  if(typeof theme === "undefined") theme = "textmate";
+
+  if(typeof type === "undefined"){
+    type = "text/"+lang;
+    if(lang === "c_cpp") type = "text/plain";
+  }
+
+  var editor = ace.edit(element);
+  function httpPostProcessRequest(status, responseText){
+    if(status != 200) alert("ERROR["+status+"]: "+responseText);
+  }
+  function httpPost(filename, data, type){
+    var formData = new FormData();
+    formData.append("data", new Blob([data], { type: type }), filename);
+    requests.add("POST", "/admin/edit/", formData, httpPostProcessRequest);
+  }
+  function httpGetProcessRequest(status, responseText){
+      ge("preview").style.display = "none";
+      ge("editor").style.display = "block";
+      if(status == 200)
+        editor.setValue(responseText);
+      else
+        editor.setValue("");
+      editor.clearSelection();
+      editor.focus();
+      editor.gotoLine(1);
+      
+  }
+  function httpGet(theUrl, path=''){
+      requests.add("GET", "/admin/edit/", { edit: theUrl }, httpGetProcessRequest);
+  }
+
+  if(lang !== "plain") editor.getSession().setMode("ace/mode/"+lang);
+  editor.setTheme("ace/theme/"+theme);
+  editor.$blockScrolling = Infinity;
+  editor.getSession().setUseSoftTabs(true);
+  editor.getSession().setTabSize(2);
+  editor.setHighlightActiveLine(true);
+  editor.setShowPrintMargin(false);
+  editor.commands.addCommand({
+      name: 'saveCommand',
+      bindKey: {win: 'Ctrl-S',  mac: 'Command-S'},
+      exec: function(editor) {
+        httpPost(file, editor.getValue()+"", type);
+      },
+      readOnly: false
+  });
+  editor.commands.addCommand({
+      name: 'save2Command',
+      bindKey: {win: 'F2',  mac: 'F2'},
+      exec: function(editor) {
+        httpPost(file, editor.getValue()+"", type);
+      },
+      readOnly: false
+  });
+  editor.commands.addCommand({
+      name: 'undoCommand',
+      bindKey: {win: 'Ctrl-Z',  mac: 'Command-Z'},
+      exec: function(editor) {
+        editor.getSession().getUndoManager().undo(false);
+      },
+      readOnly: false
+  });
+  editor.commands.addCommand({
+      name: 'redoCommand',
+      bindKey: {win: 'Ctrl-Shift-Z',  mac: 'Command-Shift-Z'},
+      exec: function(editor) {
+        editor.getSession().getUndoManager().redo(false);
+      },
+      readOnly: false
+  });
+  ge('saveButton').style='top:5px';
+  httpGet(file);
+  editor.loadUrl = function(filename, path){
+    file = filename;
+    lang = getLangFromFilename(file);
+    type = "text/"+lang;
+    if(lang !== "plain") editor.getSession().setMode("ace/mode/"+lang);
+    httpGet(file);
+  };
+  top.xtype=type;
+  top.xfile=file;
+  top.xe = editor;  
+  return editor;
+}
+function onBodyLoad(){
+  var vars = {};
+  var parts = window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi, function(m,key,value) { vars[key] = value; });
+  var editor = createEditor("editor", vars.file, vars.lang, vars.theme);
+  var tree = createTree("tree", editor);
+  createFileUploader("uploader", tree, editor);
+};
+
+function resizeIt(a) {
+  x = a.clientX;
+  if (!x) return;
+  xx = (x-3)+'px';
+  xy = (x+5)+'px';
+  ge("tree").style.width=xx;
+  ge("editor").style.left=xy;  
+  ge("resizer").style.left=xx;
+}
+top.xinfo = Array();
+function dhide(a) {
+  setTimeout(function(){a.style='top:5px;'},3000);
+}
+</script>
+<!--
+<script src="/ace/ace.js" type="text/javascript" charset="utf-8"></script>
+//-->
+<script src="http://cdnjs.cloudflare.com/ajax/libs/ace/1.2.6/ace.js" type="text/javascript" charset="utf-8"></script>
+</head>
+<body onload="onBodyLoad();">
+  <div id="loader" class="loader"><center><div class=xloader></div></center></div>
+  <div id="uploader"></div>
+  <div id="saveButton" onclick="top.xe.focus();xe.execCommand('saveCommand');this.style='top:2px;';" onmouseover="this.style='top:21px;'" onmouseout ="dhide(this)" style='position:absolute;float:right'>Save File</div>
+
+<div id="tree">
+    
+  <div class="plashka">Files<span id="_space" style='float:right;font-size:12px;font-family:MS Sans Serif;color:#006699;margin-right:10px'></span></div>
+<!--  <div id="_space" style='bottom:0px;width:88%;height:40px;font-size:10px;font-family:MS Sans serif;display:block;color:#777777'></div>
+//-->
+</div>
+  
+<!--
+    <div id="tree">
+    
+  <div class="plashka">Files</div>
+  </div>
+//-->
+  <div id="resizer" ondrag='resizeIt(event)'></div>  
+  <div id="editor"></div>
+  <div id="preview" style="display:none;"></div>
+<!--
+  <div id="www" style="contentEditable:true;display:block;position:absolute;right:0px;bottom:0px;width:70% ;height:70%;border:solid 1px"></div>
+//-->
+  <iframe id="download_frame" style='display:none;'></iframe>
+</body>
+</html>

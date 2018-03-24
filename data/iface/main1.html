@@ -1,0 +1,58 @@
+<script src="/ace/webix.js" type="text/javascript"></script>
+<link rel="STYLESHEET" type="text/css" href="/ace/webix.css">
+<body>
+    	<script>
+            var gage4 = {
+                view: "gage", id:"dtemp",
+                value: 0,
+                minRange: 10,
+                maxRange: 30,
+                label: "Температура воды",
+                height:240,
+                placeholder: "C",                
+                smoothFlow: true
+              
+            };
+
+            var gage5 = {
+                view: "gage",
+                value: 0,
+                minRange: -100,
+                maxRange: 100,
+                label: "Speed",
+                placeholder: "km/hour",
+                smoothFlow: false
+            };
+
+            var gage6 = {
+                view: "gage", id:"g6",
+                value: 40,
+                minRange: 0,
+                maxRange: 100,
+                label: "CPU usage",
+                height:210,
+                smoothFlow: false
+            };
+
+            webix.ui({ rows:[
+                { cols:[ gage4, gage5, gage6 ],height:500},
+
+            ]});
+
+            setInterval(function(){
+                var value = Math.floor(Math.random()*100);
+                value = (value/1.4).toFixed(2);
+                var dtemp = parseFloat(top.sens["dtemp"]);
+                value = top.getSens("dtemp");
+                $$("dtemp").setValue(value);
+                $$("g6").setValue(value);
+            }, 1500)
+            
+            
+//        function getTemp() {
+          
+//          return parseFloat(top.sens["dtemp"]);
+//        }
+        
+    	</script>
+    </body>

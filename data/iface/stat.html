@@ -1,0 +1,209 @@
+<link rel="stylesheet" href="http://ponika.org/i/css/styles.css" type="text/css" >
+<link rel="stylesheet" href="http://ponika.org/i/ace/jquery-ui.css">
+<script type="text/javascript" src="http://ponika.org/i/ace/jquery-2.2.4.js"></script>
+<script type="text/javascript" src="http://ponika.org/i/ace/jquery-ui.min.js"></script>
+
+<script>
+
+
+    function ge(s){ return document.getElementById(s);}
+
+ top.axitems = [];
+
+  $.getJSON( "/_data", function( data ) {
+  $.each( data, function( key, val ) {
+//    items.push( "<li id='" + key + "'>" + val + "</li>" );
+    top.axitems[key] = val;
+  });
+
+out = '"';
+for(i=0;i<top.axitems.length;i++) {
+  nn = top.axitems[i]['name'];
+  if (found = nn.match(/.*(\d{4}\-\d{2}\-\d{2})\.*/i)) {
+    top.axitems[i] = found[1];
+} else top.axitems[i]="";
+  
+}
+
+	    $('#datepicker').datepicker({
+			  beforeShowDay: highLight,
+			  selectOtherMonths:true,
+	//			beforeShowDay: true,
+//	      navigationAsDateFormat:true,
+				inline: true,
+				nextText: '&rarr;',
+				prevText: '&larr;',
+				showOtherMonths: true,
+				dateFormat: 'dd MM yy',
+//				monthNames: ['Январь', 'Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'],
+				dayNamesMin: ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
+				onSelect: function(dateText) {
+				  dd = new Date(dateText);
+				  top.lname = dd.getFullYear() + '-' + ('0' + (dd.getMonth() + 1)).slice(-2) + '-' + ('0' + dd.getDate()).slice(-2);
+          xfnd = false;for(i=0;i<top.axitems.length;i++) if (top.axitems[i]==top.lname) {xfnd = true;break;}
+//          alert(dd+' - '+dateText+' - '+xfnd);
+          if (xfnd) ge('fchart').src='/iface/chart.html';
+          
+                      }
+			});
+  
+      function highLight(date) {
+        for (var i = 0; i < top.axitems.length; i++) {
+          if (!top.axitems[i]) continue; 
+            xx = top.axitems[i].split('-');
+            if (new Date(parseInt(xx[0]),(parseInt(xx[1])-1),parseInt(xx[2])).toString() == date.toString()) {
+              return [true, 'ui-state-holiday'];
+            }
+        }
+        return [true,''];
+        }
+
+});
+
+function gonow() {
+ge("fchart").src="/iface/chartnow.html";
+}
+</script>
+
+<style>
+body{
+  background:#333333;
+  margin:0;
+  padding:0;
+  align:center;
+}
+a{margin:5px;padding:10px;}
+th{font-weight:normal;}
+
+.hdr{
+  font-size:16px;
+  cursor:pointer;
+  background:#F0F0F0;
+  color:black;
+  display:block;
+  padding:5px;
+  border:solid #555555 1px;
+  font-family:MS Sans serif;
+  white-space:nowrap;
+}
+
+.ui-datepicker {
+	width: 216px;
+	height: auto;
+	margin: 3px auto 0;
+	font: 9pt Arial, sans-serif;
+}
+
+.ui-datepicker td {
+ border:solid #FFF 1px;
+ padding:0px;
+ margin:0px;
+}
+.ui-datepicker td span, .ui-datepicker td a {
+  display: inline-block;
+  text-align: center;
+  width: 28px;
+  height: 28px;
+  line-height: 28px;
+  color: #333333;
+  margin:0;
+  padding:0;
+}
+.ui-datepicker-calendar .ui-state-default {
+  background: #ededed;
+  border: solid #FCFCFC 1px;
+}
+.ui-datepicker-unselectable .ui-state-default {
+  background: #999999;
+  color: #333333;
+  border:  0px;
+}
+.ui-state-holiday .ui-state-default {
+    color: white;
+    font-weight:bold;
+    background:#6699FF;
+}
+.ui-datepicker-calendar .ui-state-active,.ui-state-holiday .ui-state-active  {
+  color:white;
+  font-weight:bold;
+  border: solid #FFF 1px;
+  background: brown;
+  
+  
+  position:relative;
+  border:ridge #A0A0A0 1px;
+} 
+
+
+</style>
+
+<table width=100% height=100% cellpadding=0 cellspacing=0 border=0><tr valign=top style='white-space:nowrap;word-break: break-all;'>
+<td style='width:234px;'>
+  <div style='margin:0;padding:0;width:233px;display:block;height:100%;background:#A5A5A5'>
+  <div id="datepicker"></div>
+    </div>
+  </td>
+<td style='width:100%'><iframe id='fchart' style='width:100%;height:100%;border:0' src='/iface/chart.html'></iframe></td>
+</tr>
+</table>
+
+
+<!--
+
+.ui-datepicker {
+	width: 232px;
+	height: auto;
+	margin: 2px;
+	font: 9pt Arial, sans-serif;
+}
+
+.ui-datepicker td {
+ border:solid #FFF 1px;
+ margin:0px;
+ padding:0px;
+}
+
+.ui-datepicker td span, .ui-datepicker td a {
+  display: inline-block;
+  text-align: center;
+  width: 26px;
+  height: 26px;
+  line-height: 20px;
+
+  color: #333333;
+  margin:0;
+  padding:0px;
+	font: 14px Arial, sans-serif;  
+	text-decoration:none;
+}
+
+
+
+.ui-datepicker-calendar .ui-state-default {
+  background: #ededed;
+  border: solid #FCFCFC 1px;
+
+}
+.ui-datepicker-unselectable .ui-state-default {
+  background: #999999;
+  color: #333333;
+  border:  0px;
+
+}
+.ui-state-holiday .ui-state-default {
+    color: white;
+    font-weight:bold;
+    background:#6699FF;
+
+}
+.ui-datepicker-calendar .ui-state-active,.ui-state-holiday .ui-state-active  {
+  color:white;
+  font-weight:bold;
+  border: solid 1px;
+  background: #006699;
+  position:relative;
+  border:solid 1px;
+  
+
+} 
+//-->

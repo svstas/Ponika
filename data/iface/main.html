@@ -1,0 +1,169 @@
+<link href="/css/styles.css" type="text/css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="http://ponika.org/i/js/d3.slider.css" media="screen" />
+
+
+    <style>
+    .rel,.relon  {
+      border:outset 1px;
+      color:black;
+      border-radius:30px;
+      font-size:16px;
+      padding:22px 26px 22px 26px;
+      margin:3px;
+      background:white;
+    }
+    
+    .relon{
+      color:white;
+      background:brown;
+    }
+    
+    </style>
+    <script type="text/javascript" src="http://ponika.org/i/js/d3.js"></script>
+    <script src="http://ponika.org/i/js/d3.slider.js"></script>
+    <script type="text/javascript" src="http://ponika.org/i/js/gauge.js"></script>
+    <script type="text/javascript">
+
+    function ge(s){ return document.getElementById(s);}
+
+//#############################################################3
+	var gauges = [];
+			
+			function createGauge(name, label, min, max, cgreen, cyellow, cred) {
+				var config = {
+					size: 140,
+					label: label,
+					min: undefined != min ? min : 0,
+					max: undefined != max ? max : 100,
+					greenColor  : "#99C648",
+					redZones    : [{from: 0, to: cgreen[0]}],
+					greenZones  : [{from: cgreen[0], to: cgreen[1]}],
+					yellowZones : [{from: cyellow[0], to: cyellow[1]}],										
+					redZones    : [{from: cred[0], to: cred[1]}],										
+					minorTicks: 5
+				}
+
+				gauges[name] = new Gauge(name + "GaugeContainer", config);
+				gauges[name].render();
+			}
+			
+			function createGauges()	{
+
+      
+
+        for (i in top.sensors) {
+          span = ce("span");
+          span.id = i+'GaugeContainer';
+          span.style='padding:5px';
+
+          ge("chart_div").appendChild(span);
+
+          if (top.sensors[i][7]) start = parseInt(top.sensors[i][7]); else start=0;
+          if (top.sensors[i][8]) end = parseInt(top.sensors[i][8]); else end=100;
+          if (top.sensors[i][9]) grn = top.sensors[i][9].match(/\[(\d+),(\d+)\]/); else grn = Array(0,0,0);
+          if (top.sensors[i][10]) yel = top.sensors[i][10].match(/\[(\d+),(\d+)\]/); else yel = Array(0,0,0);
+          if (top.sensors[i][11]) red = top.sensors[i][11].match(/\[(\d+),(\d+)\]/); else red = Array(0,0,0);
+
+  				createGauge(i,top.sensors[i][3],start,end,[grn[1],grn[2]],[yel[1],yel[2]],[red[1],red[2]]);
+
+        }
+			}
+			
+			gflag=true;
+			
+			function updateGauges()	{
+
+				for (var key in gauges) {
+
+        if (top.sensors[key][0]>-1) {
+				  value = parseFloat(top.ssens[top.sensors[key][0]]);
+		      if (value)  gauges[key].redraw(value);
+        }
+        
+				}
+				
+			}
+			
+			function initialize()
+			{
+				createGauges();
+				setInterval(updateGauges, 1000);
+				top.setRelay(false);
+
+			}
+
+//############################################################
+function ce(s){ return document.createElement(s);}
+tslide = false;
+toSlide=0;
+
+function getVal(a) {
+  alert(a);
+//  alert(slider);
+}
+
+function setSet(a) {
+ if (!tslide) {
+   if (ge('slider') == null) {
+    var cp = ce("span");
+    cp.style='position:relative;margin-left:-160px;left:20px;top:70px;width:160px;display:inline-block';
+    cp.innerHTML="<div id='slider' style='position:absulute'></div>";
+    a.appendChild(cp);
+    var slider = d3.slider().min(0).max(1024).value(top.sens['xfun']).showRange(true)
+
+    .callback(function(evt, value) {
+      toSlide=slider.value();      
+    });
+  
+      d3.select('#slider').call(slider);
+      
+    } else ge('slider').style.display='block';
+    tslide=true;
+  } else {
+      ge('slider').style.display='none';
+      ge("_hd").src="/_data?setPar="+parseInt(toSlide);;
+      tslide=false;
+  }
+  
+}
+
+</script> 
+
+<body bgcolor="#EEE" align=center onload="if(top.sensLoaded) initialize(); else window.setTimeout('initialize()',1000)" onselectstart='return false'>
+  
+<div align=center>
+<br>
+  <div class=hdr2 id="chart_div" style='padding-bottom:7px;'><div class=hdr1 style='margin-bottom:10px'>Панель приборов</div>
+
+  </div>
+
+<br><br>
+
+  <div class=hdr2>
+  <div class=hdr1 style='margin-bottom:30px;'>Состояние РЕЛЕ</div>
+
+    <div id="rstate" style='height:50px'>
+      <script>
+      for(i=0;i<8;i++) document.write("<span id='_rrr"+i+"' class=rel>"+i+"</span>");
+      
+      </script>
+      
+      
+    </div>
+    
+</div>
+
+<script>
+
+</script>
+
+
+
+
+<iframe id="_hd" src="/_data" style='display:none'></iframe>
+
+</body>
+
+<script>
+top.loaded=1
+</script>

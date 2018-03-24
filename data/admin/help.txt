@@ -1,0 +1,3 @@
+Just Help file
+Location: /admin/help.txt
+Editable

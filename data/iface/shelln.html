@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+    <title>WebSocketTester</title>
+    <style type="text/css" media="screen">
+    body {
+      margin:0;
+      padding:0;
+      background-color: black;
+      font-size:20px;      
+    }
+
+    #dbg, #input_div, #input_el {
+      font-family: monaco;
+      font-size: 20px;
+      line-height: 22px;
+      color: #AAA;
+    }
+
+    #dbg, #input_div {
+      margin:0;
+      padding:0;
+      padding-left:4px;
+    }
+
+    #input_el {
+      width:98%;
+      background-color: rgba(0,0,0,0);
+      border: 0px;
+    }
+    #input_el:focus {
+      outline: none;
+    }
+    </style>
+    <script type="text/javascript">
+    var ws = null;
+    var xhistory = Array(); 
+    var pp=0;
+    
+    function setCursor(node,pos){
+
+    var node = (typeof node == "string" || node instanceof String) ? document.getElementById(node) : node;
+
+    if(!node){
+        return false;
+    }else if(node.createTextRange){
+        var textRange = node.createTextRange();
+        textRange.collapse(true);
+        textRange.moveEnd(pos);
+        textRange.moveStart(pos);
+        textRange.select();
+        return true;
+    }else if(node.setSelectionRange){
+        node.setSelectionRange(pos,pos);
+        return true;
+    }
+
+    return false;
+}
+    
+    function ge(s){ return document.getElementById(s);}
+    function ce(s){ return document.createElement(s);}
+    function stb(){ window.scrollTo(0, document.body.scrollHeight || document.documentElement.scrollHeight);          ge("input_el").focus(); }
+    function sendBlob(str){
+      var buf = new Uint8Array(str.length);
+      for (var i = 0; i < str.length; ++i) buf[i] = str.charCodeAt(i);
+      ws.send(buf);
+    }
+    function addMessage(m){
+      var msg = ce("div");
+      msg.innerText = m;
+      ge("dbg").appendChild(msg);
+//      ge("dbg").insertBefore(msg, ge("dbg").firstChild);
+      stb();
+    }
+    function startSocket(){
+      ws = new WebSocket('ws://'+document.location.host+'/ws',['arduino']);
+      ws.binaryType = "arraybuffer";
+      ws.onopen = function(e){
+        addMessage("Connected");
+        ge("input_el").focus();
+      
+      };
+      
+      ws.onclose = function(e){
+        addMessage("Disconnected");
+       xx = window.setTimeout("startSocket()",3000); 
+      };
+      ws.onerror = function(e){
+        console.log("ws error", e);
+        addMessage("Error");
+
+      };
+      ws.onmessage = function(e){
+        return;
+        var msg = "";
+        if(e.data instanceof ArrayBuffer){
+          msg = "BIN:";
+          var bytes = new Uint8Array(e.data);
+          for (var i = 0; i < bytes.length; i++) {
+            msg += String.fromCharCode(bytes[i]);
+          }
+        } else {
+          msg = "TXT:"+e.data;
+        }
+        addMessage(msg);
+        ge("input_el").focus();
+  
+      };
+      ge("input_el").onkeydown = function(e){
+        stb();
+        
+        if(e.keyCode == 13 && ge("input_el").value != ""){
+          
+          val = ge("input_el").value;
+          xhistory[pp]=val;pp++;
+          if (val=='r') {startSocket();
+          return;}
+          digs = val.match(/^lb3(\d+)/);
+          if (digs) {
+            if (digs>1024) digs=1024;
+            top.xfun = parseInt(Math.round(digs/100));
+          }
+          ws.send(val);
+          ge("input_el").value = "";
+          ge("input_el").focus();
+          
+        } else if (e.keyCode==38) {pp--; if (xhistory[pp]) ge("input_el").value = xhistory[pp]+''; else pp++;
+        } else if (e.keyCode==40) {pp++; if (xhistory[pp]) ge("input_el").value = xhistory[pp]+''; else pp--;
+        } 
+      }
+    }
+    
+    function onBodyLoad(){
+      startSocket();
+      top.sstarted=true;
+//      startEvents();
+    }
+    top.loaded=true;
+    </script>
+  </head>
+  <body id="body" onload="onBodyLoad()">
+    <div style='position:absolute;display:block;width:100%;height:100%;border:solid #FFFFFF 1px;bottom:0px;vertical-align:bottom'>
+    <div id="input_div" style='position:absolute;bottom:0' >
+      $<input type="text" value="" id="input_el" onblur='this.focus()' onchange="this.selectionStart = this.selectionEnd = this.value.length">
+    </div>
+    <pre id="dbg"></pre>
+  </div>
+  </body>
+</html>

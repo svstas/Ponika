@@ -1,0 +1,561 @@
+<!DOCTYPE html public "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+  <head>
+    <meta http-equiv="Content-type" content="text/html; charset=UTF-8">
+  <link href="http://ponika.org/i/css/bootstrap.css" type="text/css" rel="stylesheet">
+<link rel="stylesheet" href="http://ponika.org/i/ace/jquery-ui.css">
+  <link href="http://ponika.org/i/ace/styles.css" type="text/css" rel="stylesheet">
+  <link href="/css/styles.css" type="text/css" rel="stylesheet">
+    <style type="text/css" media="screen">
+     body {
+      margin:0;
+      padding:0;
+      height:100%;
+      overflow-y:hidden;
+    }
+    </style>
+    <script type="text/javascript">
+    sstarted=false;
+    relays = Array(0,0,0,0,0,0,0,0);  
+    relsens = Array();
+    top.ssens = Array();
+    top.achart = false;
+    top.sensid = Array();
+    function setRelay(a) {
+      for (i=0;i<8;i++) {
+      if (a) {
+        rr = a.substr(i,1);
+        if (rr=="+") relays[i] = 1; else relays[i]=0;
+      } else {if (relays[i]==1) rr="+"; else rr="-";}
+      if (gex("rstate")) {
+        obj = gex("_rrr"+i);
+       if (rr=="+" && obj.className=='rel') obj.className='relon';
+       if (rr=="-" && obj.className=='relon') obj.className='rel';
+       }
+                                                                                                                                                               
+      }                                                                                                                                                        
+                                                                                                                                                               
+    }                                                                                                                                                          
+                                                                                                                                                               
+                                                                                                                                                               
+    var sctime = 0;                                                                                                                                            
+    var client1 = new XMLHttpRequest();client1.open('GET', '/time');                                                                                           
+          client1.onreadystatechange = function() {                                                                                                            
+              var xctime = client1.responseText;                                                                                                               
+              if (xctime) sctime=parseInt(xctime);                                                                                                             
+          };                                                                                                                                                   
+      client1.send();                                                                                                                                          
+                                                                                                                                                               
+    </script>                                                                                                                                                  
+    <script type="text/javascript" src="/admin/coff.js"></script>                                                                                              
+    <script type="text/javascript" src="http://ponika.org/i/ace/jquery-2.2.4.js"></script>                                                                     
+    <script type="text/javascript" src="http://ponika.org/i/ace/jquery-ui.min.js"></script>
+    <script type="text/javascript">
+    
+    
+    
+    
+    
+    
+;(function (global) {
+
+if ("EventSource" in global) return;
+
+var reTrim = /^(\s|\u00A0)+|(\s|\u00A0)+$/g;
+
+var EventSource = function (url) {
+  var eventsource = this,  
+      interval = 500, // polling interval  
+      lastEventId = null,
+      cache = '';
+
+  if (!url || typeof url != 'string') {
+    throw new SyntaxError('Not enough arguments');
+  }
+
+  this.URL = url;
+  this.readyState = this.CONNECTING;
+  this._pollTimer = null;
+  this._xhr = null;
+  
+  function pollAgain(interval) {
+    eventsource._pollTimer = setTimeout(function () {
+      poll.call(eventsource);
+    }, interval);
+  }
+  
+  function poll() {
+    try { // force hiding of the error message... insane?
+      if (eventsource.readyState == eventsource.CLOSED) return;
+
+      // NOTE: IE7 and upwards support
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', eventsource.URL, true);
+      xhr.setRequestHeader('Accept', 'text/event-stream');
+      xhr.setRequestHeader('Cache-Control', 'no-cache');
+      // we must make use of this on the server side if we're working with Android - because they don't trigger 
+      // readychange until the server connection is closed
+      xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+      if (lastEventId != null) xhr.setRequestHeader('Last-Event-ID', lastEventId);
+      cache = '';
+    
+      xhr.timeout = 50000;
+      xhr.onreadystatechange = function () {
+        if (this.readyState == 3 || (this.readyState == 4 && this.status == 200)) {
+          // on success
+          if (eventsource.readyState == eventsource.CONNECTING) {
+            eventsource.readyState = eventsource.OPEN;
+            eventsource.dispatchEvent('open', { type: 'open' });
+          }
+
+          var responseText = '';
+          try {
+            responseText = this.responseText || '';
+          } catch (e) {}
+        
+          // process this.responseText
+          var parts = responseText.substr(cache.length).split("\n"),
+              eventType = 'message',
+              data = [],
+              i = 0,
+              line = '';
+            
+          cache = responseText;
+        
+          // TODO handle 'event' (for buffer name), retry
+          for (; i < parts.length; i++) {
+            line = parts[i].replace(reTrim, '');
+            if (line.indexOf('event') == 0) {
+              eventType = line.replace(/event:?\s*/, '');
+            } else if (line.indexOf('retry') == 0) {                           
+              retry = parseInt(line.replace(/retry:?\s*/, ''));
+              if(!isNaN(retry)) { interval = retry; }
+            } else if (line.indexOf('data') == 0) {
+              data.push(line.replace(/data:?\s*/, ''));
+            } else if (line.indexOf('id:') == 0) {
+              lastEventId = line.replace(/id:?\s*/, '');
+            } else if (line.indexOf('id') == 0) { // this resets the id
+              lastEventId = null;
+            } else if (line == '') {
+              if (data.length) {
+                var event = new MessageEvent(data.join('\n'), eventsource.url, lastEventId);
+                eventsource.dispatchEvent(eventType, event);
+                data = [];
+                eventType = 'message';
+              }
+            }
+          }
+
+          if (this.readyState == 4) pollAgain(interval);
+          // don't need to poll again, because we're long-loading
+        } else if (eventsource.readyState !== eventsource.CLOSED) {
+          if (this.readyState == 4) { // and some other status
+            // dispatch error
+            eventsource.readyState = eventsource.CONNECTING;
+            eventsource.dispatchEvent('error', { type: 'error' });
+            pollAgain(interval);
+          } else if (this.readyState == 0) { // likely aborted
+            pollAgain(interval);
+          } else {
+          }
+        }
+      };
+    
+      xhr.send();
+    
+      setTimeout(function () {
+        if (true || xhr.readyState == 3) xhr.abort();
+      }, xhr.timeout);
+      
+      eventsource._xhr = xhr;
+    
+    } catch (e) { // in an attempt to silence the errors
+      eventsource.dispatchEvent('error', { type: 'error', data: e.message }); // ???
+    } 
+  };
+  
+  poll(); // init now
+};
+
+EventSource.prototype = {
+  close: function () {
+    // closes the connection - disabling the polling
+    this.readyState = this.CLOSED;
+    clearInterval(this._pollTimer);
+    this._xhr.abort();
+  },
+  CONNECTING: 0,
+  OPEN: 1,
+  CLOSED: 2,
+  dispatchEvent: function (type, event) {
+    var handlers = this['_' + type + 'Handlers'];
+    if (handlers) {
+      for (var i = 0; i < handlers.length; i++) {
+        handlers[i].call(this, event);
+      }
+    }
+
+    if (this['on' + type]) {
+      this['on' + type].call(this, event);
+    }
+  },
+  addEventListener: function (type, handler) {
+    if (!this['_' + type + 'Handlers']) {
+      this['_' + type + 'Handlers'] = [];
+    }
+    
+    this['_' + type + 'Handlers'].push(handler);
+  },
+  removeEventListener: function (type, handler) {
+    var handlers = this['_' + type + 'Handlers'];
+    if (!handlers) {
+      return;
+    }
+    for (var i = handlers.length - 1; i >= 0; --i) {
+      if (handlers[i] === handler) {
+        handlers.splice(i, 1);
+        break;
+      }
+    }
+  },
+  onerror: null,
+  onmessage: null,
+  onopen: null,
+  readyState: 0,
+  URL: ''
+};
+
+var MessageEvent = function (data, origin, lastEventId) {
+  this.data = data;
+  this.origin = origin;
+  this.lastEventId = lastEventId || '';
+};
+
+MessageEvent.prototype = {
+  data: null,
+  type: 'message',
+  lastEventId: '',
+  origin: ''
+};
+
+if ('module' in global) module.exports = EventSource;
+global.EventSource = EventSource;
+ 
+})(this);
+    
+    
+    
+    
+    
+    
+    
+    
+
+    top.sens = Array();
+    top.sensLoaded=false;
+
+  top.date = new Date();
+  top.lname = top.date.getFullYear() + '-' + ('0' + (top.date.getMonth() + 1)).slice(-2) + '-' + ('0' + top.date.getDate()).slice(-2);
+  top.sstype = 'spline';
+  top.maxsecs=-1;
+  top.rangeSelector = 8;
+  
+    function ge(s){ return document.getElementById(s);}
+    function gex(s){
+
+//addMessage(window.frames['xframe'].contentWindow.frames['fchart'].contentWindow.document.getElementById(s));
+    if (window.frames['xframe'].contentWindow.document.getElementById(s)) return window.frames['xframe'].contentWindow.document.getElementById(s);
+      else return ge("null");
+      
+    }
+    function ce(s){ return document.createElement(s);}
+    function stbx(){ xdiv = gex("work");if (xdiv) xdiv.scrollTop = xdiv.scrollHeight - xdiv.clientHeight+50;
+//    window.scrollTo(0, document.body.scrollHeight || document.documentElement.scrollHeight);
+      
+    }
+    top.xcommand = "";
+    function addMessage(m){
+
+      var msg = ce("div");
+      msg.innerText = m;
+
+
+    if (ge('xframe').src.match(/\/shell/)) {
+      if (top.xcommand) { var msg1 = ce("div"); msg1.style.color="#777777";msg1.innerText = "[ponika ~]#"+top.xcommand;top.xcommand = "";gex("dbg").appendChild(msg1);}
+      gex("dbg").appendChild(msg);
+      stbx();
+    } else {
+      
+      xx = ge("dbg");
+      if (xx) {
+        ge("dbg").appendChild(msg);
+        ge("dbg").insertBefore(msg, ge("dbg").firstChild);
+      }
+  //  stb();
+  }
+      
+    }
+  
+
+  function getSens(a) {
+
+    return parseFloat(top.sens[a]);
+  }
+
+  otime = 0;
+  stime = 0;
+  xmem = 0;
+
+  
+  function setTime(a) {
+//    alert(a[3]);
+    if (a[0]) {
+
+      stime = parseInt(a[0]); 
+      
+
+    } else stime=0;
+    
+    for (i=1;i<a.length;i++) {
+      b = a[i].split(":");
+//      alert(b[1]);
+      top.ssens[b[0]]=parseFloat(b[1]);
+  //    alert(parseFloat(b[1]));
+    }
+    
+    if (a[1]) {xmem = a[1];top.ssens[100] = xmem;top.ssens[0] = xmem;}
+
+  tm = new Date();
+  tmm = tm.getTime();
+  tm = parseInt(tmm/1000);
+  otime = stime-tm;
+  tm = new Date(stime*1000);//tm.setTime(stime);
+//  if (gex('_gdate')) gex('_gdate').innerHTML = tm.getHours()+":"+tm.getMinutes()+":"+tm.getSeconds();
+  if (gex('_gdate')) gex('_gdate').innerHTML = tm.toISOString().slice(11,19);
+      ge('mtime').innerHTML = tm.toISOString().slice(11,19);
+
+  }
+  
+
+  var es;
+  function gettime(itime) {
+
+    var cctime = new Date(itime*1000);
+
+//=====
+   offset = cctime.getTimezoneOffset();
+    cctime.setMinutes(cctime.getMinutes() - offset);
+
+
+
+//alert(cctime.getTimezoneOffset());
+//  if (sctime)  cctime.setTime(sctime);
+  var out = cctime.toISOString().slice(0,19).replace(/T/,' ').replace(/\-/g,'/');
+  return out;
+  }
+  
+  function startEvents(){
+
+  tm = new Date();
+//  stime = tm.getTime()/1000;
+  ctime = stime;
+  //.slise(0,10)
+  otime = 0;
+      if (es) es.close();
+      es = new EventSource('/events');
+      es.onopen = function(e) {addMessage(gettime(stime)+" : Соединение установлено");if (top.sstarted && (window.frames['xframe'].contentWindow.startSocket)) window.frames['xframe'].contentWindow.startSocket();};
+      es.onerror = function(e) {if (e.target.readyState != EventSource.OPEN) {addMessage(gettime()+" : Соединение закрыто");}};
+      es.addEventListener('sms', function(e) {addMessage(e.data);},false);
+      es.addEventListener('r',function(e) {setRelay(e.data);},false);
+      es.addEventListener('x',function(e) {setSens(e.data);},false);
+      es.addEventListener('s',function(e) {setTime(e.data.split("|"));},false);
+  }
+
+
+  top.xfunc='';
+var ipr = 0;
+olda=0;
+
+  function setSens(a) {
+     b = a.split("#");
+    top.sensors = Array();
+    for(i=0;i<b.length;i++) {
+      c = b[i].split("@");
+      if (c.length<2) continue;
+      name = c[0];
+      if (!top.achart) top.achart=name;
+      top.sensors[name] = c[1].split("|");
+      top.sensid[top.sensors[name][1]] = name;
+      rels = top.sensors[name][1];
+    if (rels) {
+    rr = rels.split(",");
+    top.relsens[name]=Array();
+    if (rr.length) for (j=0;j<rr.length;j++) {rr[j]--;top.relsens[name].push(rr[j]);} else {rels--;top.relsens[name].push(rels);}
+    }}
+    top.sensors['mem'] = Array(0,0,100,"Память",0,0,0,0,34000,"[22000,34000]","[12000,22000]","[0,12000]");
+    top.sensLoaded = true;
+  
+//  alert(top.sensors['bmp1t']);
+    //top.sensors["mem"] = Array("mem","",100,"Память","X",1,"int");
+
+  }
+
+  function setparms(a) {
+   
+  }
+    
+
+
+    </script>
+
+<script>
+var olds='mmain';
+var xxb=0;
+function domenu(a) {
+  if (a==xxb) return;
+  if (a.id=='mdebug') {
+    if (ge("fdbg").style.display=='none') ge("fdbg").style.display='block'; else ge("fdbg").style.display='none';
+  } else {
+    if (a.id!='mmain') a.className='menuon';
+    ge(olds).className='menu';
+    olds = a.id;  
+    top.loaded=false;
+    ge("xframe").src='/iface/'+olds.substr(1)+'.html';
+    xxb=a;
+  }
+    
+}
+
+function gonow() {
+  
+}
+
+function checkonline() {
+  if (stime){
+  tm = new Date();
+  ctime = tm.getTime();
+  ctime = parseInt(ctime/1000);
+
+res = parseInt(stime)-otime-parseInt(ctime);
+
+
+  if(Math.abs(res)>7) {
+//  addMessage(parseInt(stime)-otime-parseInt(ctime));
+
+    if (es) es.close();
+      es = "";
+    startEvents();
+
+
+  }
+  }
+// addMessage(res);
+var x = setTimeout('');for (var i = 0; i < x; i++);clearTimeout(x);
+x = window.setTimeout("checkonline()",2000); 
+}
+
+
+
+
+</script>
+<style>
+.mmenu{
+  background:#959595;
+  color:#FFF;
+  white-space: nowrap;
+  display:block;
+  font-size:20px;
+  padding:6px 20px 5px 22px;  
+  margin:2px;
+  font-family:MS Sans Serif;
+}
+.menu, .menu:hover,.menuon{
+  display:block;
+  font-size:16px;
+  color:#FFFFEC;
+  font-weight:bold;
+  text-shadow: 1px 1px 2px black, 0 0 5em black;
+  padding:5px 20px 4px 20px;
+  margin:0px 2px 0px 2px;
+  cursor:pointer;
+  border-radius:10px;
+  font-family:MS Sans Serif,Verdana;
+  text-transform:uppercase;
+
+} 
+.menu:hover, .menuon:hover {
+  background-color:#6699FF;
+  color:#FFF;
+}
+.menuon {
+  background:#006699;
+}
+</style>
+
+<script>
+function dbgsize(a){
+  y = a.clientY;
+  if (!y) return;
+  xx = (y-3)+'px';
+  xy = (y+5)+'px';
+//  alert(xx);
+  ge("fdbg").style.height=xx;
+  ge("fdbg").style.top=xx;
+  
+//  ge("fdbg").style.height=xx;
+//  ge("fdbg").style.bottom='10px';
+//  ge("editor").style.left=xy;  
+//  ge("resizer").style.left=xx;
+  
+}
+</script>
+</head>
+<body id="body" onload="startEvents();checkonline();">
+
+
+<div id="fdbg" style='display:none;position:absolute;padding:10px 0px 10px 0px;margin:10px 0px 10px 0px;border:ridge #FFF 2px;bottom:10px;background:#333333;left:5px;right:5px;border-radius:10px;height:240px;color:#333333;font-family:Tahoma,Verdana,MS Sans Serif;padding-left:15px;margin-bottom:-5px'>
+<!--
+<div style='width:340px;color:white;text-align"right'>Свободно <span id=_heap>00000</span> bytes</div>
+
+alert(top.achart+" - "+top.xfunc+" - "+top.xsensors[top.achart])
+
+//-->
+<div style='width:100%;position:relative;left:-8px;top:-10px;height:15px;background:#cccccc;cursor:n-resize' ondrag="dbgsize(event)"></div>
+<input type=text name=xfor style='margin-bottom:7px;width:70%' value='' onchange='top.xfunc=this.value;'><br>
+<pre id="dbg" style='padding:5px;margin:0px 5px 5px -5px;height:166px;width:100%;background:#000;color:#F0F0F0;border:ridge 2px;overflow-y:scroll;'></pre>
+</div>
+<div id="null" style='display:none'></div>
+<table cellpadding=0 cellspacing=0 border=0 width="100%" height="100%" style='height:100%'>
+  <tr valign=middle style='height:10px;background-color:#8cc04b'>
+      <td width=32%>&nbsp;</td>
+      <td style='width:222px;display:block;'><div id=mmain class=mmenu style='display:block;cursor:pointer;background:url("data:image/png;base64,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") no-repeat 22px 1px;width:200px;height:40px' onclick="if (event.ctrlKey) top.location='/admin/edit/'; else domenu(this)">&nbsp;</div></td>
+      <td><span id=mchartnew class=menu onclick="domenu(this)">Онлайн</span></td>                        
+      <td><span id=mstatx class=menu onclick="domenu(this)">Статистика</span></td>      
+      <td><span id=mshell class=menu onclick="domenu(this)">Консоль</span></td>                  
+      <td><span id=msettings class=menu onclick="domenu(this)">Настройки</span></td>             
+      <td style='padding-left:15px'>
+        
+<div style='background:#7f9761;display:block;padding:1px 5px 1px 5px;color:#FFFFFC;font-size:20px;font-weight:bold;border:solid 1px;border-radius:7px;margin:3px;' id=mtime>00:00:00</div>
+        
+      </td>             
+
+<!--      
+      <td><span id=mdebug class=menu onclick="domenu(this)" style='border-right:groove #999999 5px;'>Отладка</span></td>                  
+//-->
+      <td width=33%>&nbsp;</td>
+
+  </tr>
+<tr valign=top>
+  <td style='width:100%;height:100%' colspan=200>
+      <iframe id='xframe' height=100% width=100% style='width:100%;height:100%;border:0' src='/iface/main.html'></iframe>
+  </td>
+  </tr>
+</table>
+</body>
+</html>
+<!--
+      <td><span id=mshell class=menu onclick="domenu(this)">Консоль</span></td>            
+      <td><span id=miftt class=menu onclick="domenu(this)">Управление</span></td>            
+
+//-->

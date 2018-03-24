@@ -1,0 +1,388 @@
+<!DOCTYPE html public "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+  <head>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+  <link href="http://ponika.org/i/css/bootstrap.css" type="text/css" rel="stylesheet">
+<link rel="stylesheet" href="http://ponika.org/i/ace/jquery-ui.css">
+  <link href="http://ponika.org/i/ace/styles.css" type="text/css" rel="stylesheet">
+    <style type="text/css" media="screen">
+     body {
+      margin:0;
+      padding:0;
+      background-color: #A5A5A5;
+      height:100%;
+      overflow-y:hidden;
+    }
+    </style>
+    <script type="text/javascript">
+    sstarted=false;
+    relay = Array();  
+    
+    function setRelay(a) {
+      strs = a.split('|');
+  //alert(a);    
+    relay = Array();
+
+    for (i in strs) {
+//
+//if (!strs[i] || strs[i].match(/^\#/)) continue;
+    if (strs[i].match(/\:/)) {
+      xx = strs[i].split(":");
+      rel = xx[0];
+      relay[rel] = Array(xx[1],xx[3],xx[2]);
+      }}
+      
+    }
+    
+    function setIp(ipaddr) {
+      
+      
+//      alert(ipaddr);
+    }
+    
+    var ipaddr='';
+    var client = new XMLHttpRequest();client.open('GET', '/ip');
+          client.onreadystatechange = function() {
+              var ip = client.responseText;
+              if (ip) top.setIp(ip);
+            
+          };
+      client.send();
+      
+/*  //  function getState() {
+      client = new XMLHttpRequest();client.open('GET', '/admin/sensors/state.ini');
+          client.onreadystatechange = function() {
+          var ip = client.responseText;
+          if (ip) setRelay(ip);
+            
+          };
+      client.send();
+//    }
+*/
+    </script>
+    <script type="text/javascript" src="/admin/sensors/coff.js"></script>
+    <script type="text/javascript" src="http://ponika.org/i/ace/jquery-2.2.4.js"></script>
+    <script type="text/javascript" src="http://ponika.org/i/ace/jquery-ui.min.js"></script>
+    <script type="text/javascript">
+
+    top.sens = Array();
+    top.sensors = Array('bmp1t','bmp2t','dtemp','gtemp','ghum','bmp1p','bmp2p','xlux1','xlux2','xluxa','xmem');
+    top.xsensors = Array();
+    for(i=0;i<top.sensors.length;i++) top.xsensors[top.sensors[i]]=i;
+  
+  top.date = new Date();
+  top.temps = Array();
+  top.lname = top.date.getFullYear() + '-' + ('0' + (top.date.getMonth() + 1)).slice(-2) + '-' + ('0' + top.date.getDate()).slice(-2);
+  top.sstype = 'spline';
+  top.maxsecs=-1;
+  top.achart = 'xluxa';
+  top.rangeselector = 4;
+  
+    function ge(s){ return document.getElementById(s);}
+    function gex(s){
+
+//addMessage(window.frames['xframe'].contentWindow.frames['fchart'].contentWindow.document.getElementById(s));
+    if (window.frames['xframe'].contentWindow.document.getElementById(s)) return window.frames['xframe'].contentWindow.document.getElementById(s);
+      else return ge("null");
+      
+    }
+    function ce(s){ return document.createElement(s);}
+    function stb(){ return; xdiv = ge("dbg");if (xdiv) xdiv.scrollTop = xdiv.scrollHeight - xdiv.clientHeight;
+//    window.scrollTo(0, document.body.scrollHeight || document.documentElement.scrollHeight);
+      
+    }
+    top.xcommand = "";
+    function addMessage(m){
+
+      var msg = ce("div");
+      msg.innerText = m;
+
+
+    if (ge('xframe').src.match(/\/shell/)) {
+      if (top.xcommand) { var msg1 = ce("div"); msg1.style.color="#777777";msg1.innerText = "[ponika ~]#"+top.xcommand;top.xcommand = "";gex("dbg").appendChild(msg1);}
+      gex("dbg").appendChild(msg);
+      stb();
+    } else {
+      
+      xx = ge("dbg");
+      if (xx) {
+        ge("dbg").appendChild(msg);
+        ge("dbg").insertBefore(msg, ge("dbg").firstChild);
+      }
+    stb();
+  }
+      
+    }
+  
+
+  function getSens(a) {
+
+    return parseFloat(top.sens[a]);
+  }
+
+  otime = 0;
+  stime = 0;
+  xmem = 0;
+
+  function setTime(a) {
+    
+    if (a[0]) {
+
+      stime = a[0]; 
+
+    } else stime=0;
+    
+    if (a[1]) {xmem = a[1];top.sens['xmem'] = xmem;}
+
+  tm = new Date();
+  tmm = tm.getTime();
+  tm = parseInt(tmm/1000);
+  otime = stime-tm;
+  tm = new Date(stime*1000);
+  top.sens['gdate'] = tm.getTime();
+  }
+  
+
+  var es;
+  function gettime() {
+  var cctime = new Date();cctime = cctime.toISOString().slice(0,19).replace(/T/,' ').replace(/\-/g,'/');
+  return cctime;
+  }
+  
+  function startEvents(){
+
+  tm = new Date();
+  stime = tm.getTime()/1000;
+  ctime = stime;
+  //.slise(0,10)
+  otime = 0;
+      if (es) es.close();
+      es = new EventSource('/events');
+      es.onopen = function(e) {addMessage(gettime()+" : Соединение установлено");if (top.sstarted && (window.frames['xframe'].contentWindow.startSocket)) window.frames['xframe'].contentWindow.startSocket();};
+      es.onerror = function(e) {if (e.target.readyState != EventSource.OPEN) {addMessage(gettime()+" : Соединение закрыто");}};
+      es.addEventListener('sensors', function(e) {top.setparms(e.data);},false);
+      es.addEventListener('sms', function(e) {addMessage(e.data);},false);
+      es.addEventListener('relay',function(e) {setRelay(e.data);},false);
+      es.addEventListener('time',function(e) {setTime(e.data.split("|"));},false);
+  }
+
+
+  top.xfunc='';
+var ipr = 0;
+olda=0;
+
+  function setparms(a) {
+
+  tm = new Date();
+  time = tm.getTime()/1000;
+    
+      if (!top.loaded) return;
+  
+
+        arr = a.split("|");
+
+
+arr[5]=parseInt(arr[6]-arr[5]-180);
+//arr[0]=parseInt((arr[1]-arr[0])*1000)/1000;
+
+//if (olda>0) arr[5] = Math.round(olda*0.1+(arr[5])*0.9);
+if (Math.abs(olda-arr[5])>5) arr[5]=Math.round(olda*0.8+arr[5]*0.2);
+  
+olda = arr[5];
+
+    for (i in coffs) {
+        xfn = coffs[i].toString();
+        val = arr[top.xsensors[i]];
+        xval  = eval(xfn.replace(/X/ig,val));
+        arr[top.xsensors[i]] = xval.toFixed(2);
+    }
+
+if (top.xfunc) {
+xval = arr[top.xsensors[top.achart]]; 
+
+xx = eval(top.xfunc.replace(/X/ig,xval));
+arr[top.xsensors[top.achart]]=xx;  
+}
+
+stime = Date.parse(arr[10]);
+
+
+
+//        top.sens['bmp1p']=top.sens['bmp2p']-top.sens['bmp1p'];
+
+
+
+//if (!otime) 
+otime = stime-time;
+
+if (arr[3].match(/#/)) {
+  top.temps=arr[3].split("#");
+}
+
+        // BMP_TEMP1,BMP_TEMP2,HUM_TEMP,RTC_TEMP,HUMIMITY,BMP_PR1,BMP_PR2,LUX_54,ANALOG.TIME,HEAP
+        top.sens['gdate'] = arr[10]; gex('_gdate').innerHTML = arr[10].substring(11);
+//        top.sens['dtemp'] = arr[2]; gex('_dtemp').innerHTML = arr[2];
+        
+        top.sens['dtemp'] = top.temps[0]; gex('_dtemp').innerHTML = temps[0];
+        top.sens['gtemp'] = arr[2]; gex('_gtemp').innerHTML = arr[3];
+        top.sens['bmp1t'] = arr[0]; gex('_bmp1t').innerHTML = arr[0];
+        top.sens['bmp2t'] = arr[1]; gex('_bmp2t').innerHTML = arr[1];
+        top.sens['ghum']  = arr[4]; gex('_ghum').innerHTML  = arr[4];
+        top.sens['bmp1p'] = arr[5]; gex('_bmp1p').innerHTML = arr[5];
+        top.sens['bmp2p'] = arr[6]; gex('_bmp2p').innerHTML = arr[6];
+        top.sens['xlux1'] = arr[7]; gex('_xlux1').innerHTML  = arr[7];
+        top.sens['xlux2'] = arr[8]; gex('_xlux2').innerHTML  = arr[8];
+        top.sens['xluxa'] = arr[9]; gex('_xluxa').innerHTML = arr[9];
+        top.sens['xmem']  = arr[11];gex('_xmem').innerHTML   = arr[11];
+        top.sens['xfun'] = arr[12];
+        
+       
+//        xdf = top.sens['bmp2t']-top.sens['bmp1t'];top.sens['tdiff']  = xdf;
+//        top.sens['diff']  = top.sens['bmp2p']-top.sens['bmp1p'];
+//        ge('_heap').innerHTML = arr[11];
+      
+  }
+    
+
+
+    </script>
+
+<script>
+var olds='mchartnew';
+function domenu(a) {
+  if (a.id=='mdebug') {
+    if (ge("fdbg").style.display=='none') ge("fdbg").style.display='block'; else ge("fdbg").style.display='none';
+  } else {
+    a.className='menuon';
+    ge(olds).className='menu';
+    olds = a.id;  
+    top.loaded=false;
+    ge("xframe").src='/iface/'+olds.substr(1)+'.html';
+  }
+    
+}
+
+function gonow() {
+  
+}
+
+function checkonline() {
+  if (stime){
+  tm = new Date();
+  ctime = tm.getTime();
+  ctime = parseInt(ctime/1000);
+
+res = parseInt(stime)-otime-parseInt(ctime);
+
+
+  if(Math.abs(res)>7) {
+//  addMessage(parseInt(stime)-otime-parseInt(ctime));
+
+    if (es) es.close();
+      es = "";
+    startEvents();
+
+
+  }
+  }
+// addMessage(res);
+var x = setTimeout('');for (var i = 0; i < x; i++);clearTimeout(x);
+x = window.setTimeout("checkonline()",2000); 
+}
+
+
+
+
+</script>
+<style>
+.mmenu{
+  background:#A5A5A5;
+  color:#FFF;
+  white-space: nowrap;
+  display:block;
+  font-size:22px;
+  padding:8px 20px 5px 40px;  
+  margin:2px;
+  font-family:MS Sans Serif;
+}
+.menu, .menu:hover,.menuon{
+  display:block;
+  color:#FFFFFC;
+  padding:8px 30px 3px 30px;
+  border:groove #999999 5px;
+  border-bottom:0px;
+  border-radius:0px;
+  border-top-left-radius:0;
+  border-bottom-left-radius:0;
+  border-bottom-right-radius:0;  
+  background:#A5A5A5;
+  border-right:0;
+  cursor:pointer;
+  font-family:MS Sans Serif,Verdana;
+  text-transform:uppercase;
+
+}
+.menu:hover, .menuon:hover {
+  background-color:#6699FF;
+  color:#FFF;
+}
+.menuon {
+  background:#006699;
+}
+</style>
+</head>
+<script>
+function dbgsize(a){
+  y = a.clientY;
+  if (!y) return;
+  xx = (y-3)+'px';
+  xy = (y+5)+'px';
+//  alert(xx);
+  ge("fdbg").style.height=xx;
+  ge("fdbg").style.top=xx;
+  
+//  ge("fdbg").style.height=xx;
+//  ge("fdbg").style.bottom='10px';
+//  ge("editor").style.left=xy;  
+//  ge("resizer").style.left=xx;
+  
+}
+</script>
+<body id="body" onload="startEvents();checkonline();">
+
+
+<div id="fdbg" style='display:none;position:absolute;padding:10px 0px 10px 0px;margin:10px 0px 10px 0px;border:ridge #FFF 2px;bottom:10px;background:#333333;left:5px;right:5px;border-radius:10px;height:240px;color:#333333;font-family:Tahoma,Verdana,MS Sans Serif;padding-left:15px;margin-bottom:-5px'>
+<!--
+<div style='width:340px;color:white;text-align"right'>Свободно <span id=_heap>00000</span> bytes</div>
+
+alert(top.achart+" - "+top.xfunc+" - "+top.xsensors[top.achart])
+
+//-->
+<div style='width:100%;position:relative;left:-8px;top:-10px;height:15px;background:#cccccc;cursor:n-resize' ondrag="dbgsize(event)"></div>
+<input type=text name=xfor style='margin-bottom:7px;width:70%' value='' onchange='top.xfunc=this.value;'><br>
+<pre id="dbg" style='padding:5px;margin:0px 5px 5px -5px;height:166px;width:100%;background:#000;color:#F0F0F0;border:ridge 2px;overflow-y:scroll;'></pre>
+</div>
+<div id="null" style='display:none'></div>
+<table cellpadding=0 cellspacing=0 border=0 width="100%" height="100%" style='height:100%'>
+  <tr valign=bottom style='height:10px'>
+      <td style='width:232px;display:block;'><div  class=mmenu>Ponika One Basic</div></td>
+      <td><span id=mmain class=menu onclick="domenu(this)">Главная</span></td>
+      <td><span id=mchartnew class=menuon onclick="domenu(this)">Онлайн</span></td>                        
+      <td><span id=mstatx class=menu onclick="domenu(this)">Статистика</span></td>      
+      <td><span id=mshell class=menu onclick="domenu(this)">Настройки</span></td>                  
+      <td><span id=mdebug class=menu onclick="domenu(this)" style='border-right:groove #999999 5px;'>Отладка</span></td>                  
+      <td width=100%>&nbsp;</td>
+  </tr>
+<tr valign=top>
+  <td style='width:100%;height:100%' colspan=200>
+      <iframe id='xframe' height=100% width=100% style='width:100%;height:100%;border:0' src='/iface/main.html'></iframe>
+  </td>
+  </tr>
+</table>
+</body>
+</html>
+<!--
+      <td><span id=mshell class=menu onclick="domenu(this)">Консоль</span></td>            
+      <td><span id=miftt class=menu onclick="domenu(this)">Управление</span></td>            
+
+//-->

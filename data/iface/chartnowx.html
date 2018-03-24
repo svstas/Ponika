@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+
+  <link href="http://ponika.org/i/css/bootstrap.css" type="text/css" rel="stylesheet">
+  <link href="http://ponika.org/i/css/styles.css" type="text/css" rel="stylesheet">
+
+    <style type="text/css" media="screen">
+     body {
+      margin:0;
+      padding:0;
+      background-color: black;
+    }
+
+  </style>
+
+    <script type="text/javascript" src="http://ponika.org/i/ace/jquery-2.2.4.js"></script>
+
+    <script type="text/javascript">
+    top.sens = Array();
+    top.sensors = Array('bmp1t','bmp2t','dtemp','gtemp','ghum','bmp1p','bmp2p','xlux1','xlux2','xluxa','xmem');
+    top.xsensors = Array();
+    for(i=0;i<top.sensors.length;i++) top.xsensors[top.sensors[i]]=i;
+  
+    function ge(s){ return document.getElementById(s);}
+    function ce(s){ return document.createElement(s);}
+
+  
+</script>
+
+<script type='text/javascript'>//<![CDATA[
+var chart;
+top.secs = 0; 
+top.loaded = false;
+$(function () {
+    $(document).ready(function () {
+        Highcharts.setOptions({
+            global: {
+                useUTC: false
+            }
+        });
+ 
+         window.chart = Highcharts.chart('container', {
+            chart: {
+                type: 'spline',
+                animation: Highcharts.svg, // don't animate in old IE
+                marginRight: 10,
+                backgroundColor: '#333',
+                zoomType : "x",
+                events: {
+                      load: function () {
+                        var timerId = setTimeout(function() { xdo(top.achart);top.loaded=true;}, 300);
+                        var xser = Array();
+                        for(var i=0;i<this.series.length;i++) xser[i]=this.series[i];
+                          setInterval(function () {
+
+                            var x = (new Date(top.sens['gdate'])).getTime();
+                            top.secs++;
+
+                            if (top.maxsecs>0 && top.secs>top.maxsecs) {
+                                    top.secs--;  
+                                  for (i=0;i<chart.series.length;i++) chart.series[i].removePoint(0);
+                            }
+
+                            for(var i=0;i<top.sensors.length;i++) {
+
+                            if (top.xsensors[top.sensors[i]] || top.xsensors[top.sensors[i]]==0) {
+                              if (i>6) y = parseInt(top.sens[top.sensors[i]]); else y = parseFloat(top.sens[top.sensors[i]]);
+                              xser[i].addPoint([x, y], true, false);
+                            }  
+                             
+                            }
+                             
+                        }, 1000);
+                      }
+                  }
+            },
+            title: {
+                style: {'color' : '#F0F0F0',
+                        'display':'none',
+                },
+                text: 'Ponika One (sensors prototype)',
+            },
+            credits: {enabled:false},
+            xAxis: {
+                type: 'datetime',
+                tickPixelInterval: 50,
+//                reversed: true,
+            },
+            yAxis: {
+          
+                title: {
+                    text: '',
+                    style: {'color' : '#F0F0F0'},
+//                    allowDecimals:false,
+                },
+                plotLines: [{
+                    value: 0,
+                    width: 1,
+                    color: '#FFF',
+                }]
+            },
+            tooltip: {
+                formatter: function () {
+                    if (this.series && this.series.name && this.series.name!=' ')
+                    return '<b>' + this.series.name + '</b><br/>' +
+                        Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', this.x) + '<br/>' +
+                        Highcharts.numberFormat(this.y, 2);
+                    }
+                },
+            legend: {
+                enabled: true,
+                borderRadius: 7,
+                backgroundColor:'#222222',
+                itemStyle: {
+                    fontSize:'12px',
+                    margin:'0px',
+                }
+            },
+            exporting: {
+                enabled: false
+            },
+            series: [
+              {
+                name: 'С°(B1)',
+                type : top.sstype,
+                visible : false,
+                data: []
+              },
+              {
+                name: 'С°(B2)',
+                type : top.sstype,
+                visible : false,
+                data: []
+              },
+              {
+                name: 'С°(H)',
+                type : top.sstype,
+                visible : false,
+                data: []
+              },
+              {
+                name: 'С°(RTC)',
+                type : top.sstype,
+                visible : false,
+                data: []
+              },
+              {
+                name: 'HUM%',
+                type : top.sstype,
+                visible : false,
+                  data: []
+              },  
+              {
+                name: 'P(B1)',
+                type : top.sstype,
+                visible : false,
+                data: []
+              },
+              {
+              
+                name: 'P(B2)',
+                type : top.sstype,
+                visible : false,
+                data: []
+              },
+              {
+                name: 'PH',
+                type : top.sstype,
+                visible : false,
+                data: []
+              },
+              {
+                name: 'EC',
+                type : top.sstype,
+                visible : false,
+                data: []
+              },
+              {
+                name: 'А1024',
+                type : top.sstype,
+            
+//                visible : false,
+                data: [],
+              },
+              {
+                name: 'MEM',
+                type : top.sstype,
+            
+//                visible : false,
+                data: [],
+              }
+            ],
+        });
+    });
+    
+});
+
+
+//]]> 
+
+
+oldb=0;
+
+
+/*
+        var $button = $('#btn');
+        $button.click(function () { return;
+          for (i=0;i<top.sensors.length;i++) {
+            var sss = chart.series[i];
+            sss.hide();
+            
+          }
+          chart.series[7].show();
+          });
+*/
+
+oldb='';
+function xdo(a) {
+
+top.achart = a;
+b = ge('__'+a);
+
+
+ if (oldb) {
+   oldb.style = "background:#F0F0F0;color:black";
+ } 
+ 
+  b.style = "background:#6699FF;color:white";
+
+oldb=b;
+olda=a;
+
+    for (i=0;i<top.sensors.length;i++) {
+    var sss = chart.series[i];
+      sss.hide();
+    }
+chart.series[top.xsensors[a]].show();
+
+}
+
+
+</script>
+
+
+<style>
+th{font-weight:normal;
+  
+}
+td{background:#555555;}
+.hdr{
+  font-size:16px;
+  cursor:pointer;
+  background:#F0F0F0;
+  color:black;
+  display:block;
+  padding:5px;
+  border:solid #555555 1px;
+  font-family:MS Sans serif;
+  white-space:nowrap;
+
+  
+}
+.dd {
+  font-size:21px;
+  padding:3px;
+  background:#000;
+  border:solid #555555 1px;
+  font-family:MS Sans serif;
+  
+  
+}
+
+</style>
+</head>
+
+<body id="body">
+<script src="http://ponika.org/i/ace/highstock.js"></script>
+<!--
+<script src="https://code.highcharts.com/highcharts.js"></script>
+<script src="https://code.highcharts.com/modules/exporting.js"></script>
+
+//-->
+
+<!--
+<div style='display:none;margin-left:2%;padding-left:12px;margin-top:10px;border:0'>Ponika One (beta 1.0)          
+               <a href="#about">Информация о системе</a>
+                <a href="#portfolio">Статистика</a>
+                <a href="#portfolio">Консоль</a>
+                <a href="#contacts">Настройки</a>
+</div>
+<div id=_debug style='position:fixed;width:100%;height:20px;color:#FFFFFF'></div>
+//-->
+
+
+<table cellspacing=0 cellpadding=0 width=100% border=0 style='margin:0;padding:0;color:white;font-family:MS Sans seris;text-align:center;border:0;'>
+  <tr valign=top>
+  <th width=235px><div class=hdr style='text-align:right;padding-right:0px'>
+    <input type=radio name=ratio value=60 onclick='top.maxsecs=this.value'>1M
+    <input type=radio name=ratio value=180 onclick='top.maxsecs=this.value'>3M
+    <input type=radio name=ratio value=600 onclick='top.maxsecs=this.value'>10M
+    <input type=radio name=ratio value=-1 onclick='top.maxsecs=this.value' checked>ALL
+    <!--
+    <button > 1m </button>&nbsp;
+    <button> 3m </button>&nbsp;    
+    <button> 10m </button>&nbsp;
+    <button> All </button>    
+
+    <select onchange='top.maxsecs=this.value' style='width:100px;margin:0px 20px 0px 0px;padding:0px;background:#fff'>
+      <option value='-1'>Все</option>
+      <option value='30'>30 сек</option>
+      <option value='60'>1 минута</option>
+      <option value='120'>2 минуты</option>
+      <option value='300'>5 минут</option>
+      <option value='600'>10 минут</option>
+    </select>
+//-->
+
+    &nbsp;&nbsp;</div></th>
+  <th><div class=hdr onclick="xdo('bmp1t')" id="__bmp1t">C°(B1)</div></th>
+  <th><div class=hdr onclick="xdo('bmp2t')" id="__bmp2t">C°(B2)</div></th>
+  <th><div class=hdr onclick="xdo('gtemp')" id="__gtemp">C°(RTC)</div></th>
+  <th><div class=hdr onclick="xdo('dtemp')" id="__dtemp">C°(UTH)</div></th>
+  <th><div class=hdr onclick="xdo('ghum')"  id="__ghum">HUM%</div></th>
+  <th><div class=hdr onclick="xdo('bmp1p')" id="__bmp1p">P(1)</div></th>
+  <th><div class=hdr onclick="xdo('bmp2p')" id="__bmp2p">P(2)</div></th>
+  <th><div class=hdr onclick="xdo('xlux1')"  id="__xlux1">PH</div></th>
+  <th><div class=hdr onclick="xdo('xlux2')"  id="__xlux2">EC</div></th>
+  <th><div class=hdr onclick="xdo('xluxa')" id="__xluxa">А1024</div></th>
+  <th><div class=hdr onclick="xdo('xmem')" id="__xmem">MEM</div></th>
+</tr><tr>
+  <td class=dd id='_gdate' style='background-color:#333;text-align:right;padding-right:10px;white-space:nowrap;'>00:00:00</td>
+  <td class=dd id='_bmp1t'>0.00</td>
+  <td class=dd id='_bmp2t'>0.00</td>
+  <td class=dd id='_gtemp'>0.00</td>
+  <td class=dd id='_dtemp'>0.00</td>
+  <td class=dd id='_ghum'>0.00</td>
+  <td class=dd id='_bmp1p'>0.00</td>
+  <td class=dd id='_bmp2p'>0.00</td>
+  <td class=dd id='_xlux1'>0</td>
+  <td class=dd id='_xlux2'>0</td>
+  <td class=dd id='_xluxa'>0</td>
+  <td class=dd id='_xmem'>0</td>
+  
+</tr>
+</table>
+<div id="container" style="position:absolute;width:100%;min-width: 310px; top:60px; margin: 0 auto;position:absolute;bottom:0"></div>
+<script>top.loaded=true;</script>
+  </body>
+</html>
