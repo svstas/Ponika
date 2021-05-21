@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<root xmlns="urn:schemas-upnp-org:device-1-0">
+<specVersion><major>1</major><minor>0</minor></specVersion>
+<URLBase>http://ponika/</URLBase>
+<device>
+	<deviceType>upnp:rootdevice</deviceType>
+	<friendlyName>Ponika©</friendlyName>
+	<presentationURL>http://ponika/</presentationURL>
+	<serialNumber>001288102232</serialNumber>
+	<modelName>Ponika</modelName>
+	<modelNumber>000000000001</modelNumber>
+	<modelURL>http://ponika.org/os/</modelURL>
+	<manufacturer>Stanislav Sobol</manufacturer>
+	<manufacturerURL>http://ponika.org</manufacturerURL>
+	<UDN>uuid:38323636-4558-4dda-9188-cda0e62391231</UDN>
+</device>
+</root>
+

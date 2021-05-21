@@ -1,0 +1,12 @@
+{
+    "hostName":"ponika", 
+    "password":"josperado",
+    "http_username":"admin",
+    "http_password":"admin",  
+    "ota":1,
+    "bluetooth":1,
+    "tcp":1,
+    "wifi":2
+}
+
+
